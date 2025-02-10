@@ -22,6 +22,80 @@ offset_days = dbutils.widgets.get("offset_days")
 
 # COMMAND ----------
 
+hms_lineage_table = "system.hms_to_uc_migration.table_access"
+hms_lineage_table_exists = spark.catalog.tableExists(hms_lineage_table)
+
+print(f"HMS lineage table exists: {hms_lineage_table_exists}")
+
+# COMMAND ----------
+
+lineage_query = ""
+
+if hms_lineage_table_exists:
+  lineage_query = """
+  
+  select
+  entity_type,
+  entity_id,
+  source_table_catalog,
+  source_table_schema,
+  source_table_full_name,
+  source_type,
+  target_table_catalog,
+  target_table_schema,
+  target_table_full_name,
+  target_type,
+  event_time,
+  workspace_id,
+  event_date
+  from system.access.table_lineage
+  union all
+  select
+  entity_type,
+  entity_id,
+  source_table_catalog,
+  source_table_schema,
+  source_table_full_name,
+  source_type,
+  target_table_catalog,
+  target_table_schema,
+  target_table_full_name,
+  target_type,
+  event_time,
+  workspace_id,
+  event_date from system.hms_to_uc_migration.table_access
+  
+  """
+else:
+
+  lineage_query = """
+  
+  select
+  entity_type,
+  entity_id,
+  source_table_catalog,
+  source_table_schema,
+  source_table_full_name,
+  source_type,
+  target_table_catalog,
+  target_table_schema,
+  target_table_full_name,
+  target_type,
+  event_time,
+  workspace_id,
+  event_date
+  from system.access.table_lineage
+  
+  """
+
+print(lineage_query)
+
+# COMMAND ----------
+
+spark.sql(lineage_query).createOrReplaceTempView("vw_lineage_data")
+
+# COMMAND ----------
+
 spark.sql(f"""
     CREATE OR REPLACE VIEW {catalog}.{schema}.vw_sources_targets_fill AS
         WITH tables_lineages AS (
@@ -65,7 +139,7 @@ spark.sql(f"""
                     END AS entity_path,
                     MAX(event_time) as last_event_time,
                     workspace_id
-                FROM system.access.table_lineage
+                FROM vw_lineage_data
                 WHERE entity_type IS NOT NULL
                     AND workspace_id = {workspace_id}
                     -- Eliminate operational data

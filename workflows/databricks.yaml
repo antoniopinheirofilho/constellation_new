@@ -1,3 +1,5 @@
+bundle:
+  name: constellation_bundle
 resources:
   jobs:
     constellation_graph_representation:
@@ -10,15 +12,13 @@ resources:
       tasks:
         - task_key: functions_and_configuration_parameters
           notebook_task:
-            notebook_path: /Workspace/Users/wesley.maciel@databricks.com/workflows/lineage_graph/Functions
-              and Configuration Parameters
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_graph/Functions and Configuration Parameters
             source: WORKSPACE
         - task_key: lineage_graph
           depends_on:
             - task_key: functions_and_configuration_parameters
           notebook_task:
-            notebook_path: /Workspace/Users/wesley.maciel@databricks.com/workflows/lineage_graph/Lineage
-              Base Sources and Targets View
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_graph/Lineage Base Sources and Targets View
             base_parameters:
               workspace_url: "{{tasks.functions_and_configuration_parameters.values.workspace\
                 _url}}"
@@ -29,8 +29,7 @@ resources:
           depends_on:
             - task_key: lineage_graph
           notebook_task:
-            notebook_path: /Workspace/Users/wesley.maciel@databricks.com/workflows/lineage_graph/Lineage
-              Base Nodes View
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_graph/Lineage Base Nodes View
             base_parameters:
               workspace_url: "{{tasks.functions_and_configuration_parameters.values.workspace\
                 _url}}"
@@ -40,24 +39,21 @@ resources:
             - task_key: lineage_graph
             - task_key: lineage_base_nodes_view
           notebook_task:
-            notebook_path: /Workspace/Users/wesley.maciel@databricks.com/workflows/lineage_graph/Lineage
-              Links
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_graph/Lineage Links
             source: WORKSPACE
         - task_key: lineage_nodes
           depends_on:
             - task_key: lineage_base_nodes_view
             - task_key: lineage_links
           notebook_task:
-            notebook_path: /Workspace/Users/wesley.maciel@databricks.com/workflows/lineage_graph/Lineage
-              Nodes
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_graph/Lineage Nodes
             source: WORKSPACE
         - task_key: purge_old_data
           depends_on:
             - task_key: lineage_links
             - task_key: lineage_nodes
           notebook_task:
-            notebook_path: /Workspace/Users/wesley.maciel@databricks.com/workflows/lineage_graph/Purge
-              Old Data
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_graph/Purge Old Data
             source: WORKSPACE
       queue:
         enabled: true
@@ -80,15 +76,13 @@ resources:
       tasks:
         - task_key: functions_and_configuration_parameters
           notebook_task:
-            notebook_path: /Workspace/Users/wesley.maciel@databricks.com/workflows/lineage_graph/Functions
-              and Configuration Parameters
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_graph/Functions and Configuration Parameters
             source: WORKSPACE
         - task_key: purge_deleted_nodes_and_links
           depends_on:
             - task_key: functions_and_configuration_parameters
           notebook_task:
-            notebook_path: /Workspace/Users/wesley.maciel@databricks.com/workflows/lineage_purge/Purge
-              Deleted Nodes and Links
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_purge/Purge Deleted Nodes and Links
             source: WORKSPACE
       queue:
         enabled: true
@@ -101,3 +95,6 @@ resources:
           default: "365"
         - name: purge_offset_days
           default: "365"
+targets:
+  dev:
+    default: true
