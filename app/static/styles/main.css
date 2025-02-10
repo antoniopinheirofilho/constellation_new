@@ -1,0 +1,722 @@
+/* Global Variables */
+:root {
+    --bg-primary: #111827;
+    --bg-secondary: #1f2937;
+    --bg-tertiary: #374151;
+    --border-color: #444;
+    --text-primary: #e0e0e0;
+    --text-white: #ffffff;
+    --accent-color: #ff6b6b;
+    --transition-default: all 0.3s ease;
+    --rounded-sm: 0.375rem;    /* Small radius */
+    --rounded: 0.5rem;         /* Medium radius */
+    --rounded-lg: 0.75rem;     /* Large radius */
+}
+
+/* Base Styles */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    margin: 0;
+    padding: 10px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Main Container */
+.container {
+    width: 1600px;          
+    height: 900px;         
+    min-height: 900px;     
+    margin: 20px auto;
+    background-color: var(--bg-secondary);
+    border-radius: var(--rounded-lg);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Add a media query for smaller screens */
+@media screen and (max-width: 1640px) {  
+    .container {
+        width: 95vw;
+        height: 90vh;
+        min-height: 90vh;
+    }
+}
+
+/* Typography */
+h1 {
+    text-align: center;
+    color: var(--text-white);
+}
+
+/* Search Container and Related Elements */
+.search-container {
+    position: relative;
+    width: 100%;
+    margin-bottom: 1.5rem;
+    z-index: 1001;
+}
+
+#search {
+    width: 100%;
+    padding: 0.75rem 1rem;   
+    border: 1px solid var(--border-color);
+    border-radius: var(--rounded);  
+    font-size: 1rem;        
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    box-sizing: border-box;
+    transition: var(--transition-default);  
+}
+
+#search:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    background-color: var(--bg-secondary);
+}
+
+#search::placeholder {
+    color: var(--text-primary);
+    opacity: 0.6;
+}
+
+#suggestions {
+    display: none;
+    width: 100%;
+    max-height: 250px;        
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 0 0 var(--rounded) var(--rounded); 
+    background-color: var(--bg-tertiary);
+    z-index: 1001;
+    box-shadow: var(--box-shadow);    
+    margin-top: 2px;  
+}
+
+.search-result-item {
+    padding: 10px;
+    cursor: pointer;
+    transition: var(--transition-default);
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-item:hover,
+.search-result-item.selected {
+    background-color: var(--border-color);
+}
+
+#suggestions::-webkit-scrollbar {
+    width: 8px;
+}
+
+#suggestions::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 0 0 4px 0;
+}
+
+#suggestions::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+#suggestions::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Graph Container */
+#graph {
+    border: 1px solid var(--border-color);
+    border-radius: var(--rounded);
+    overflow: hidden;
+    position: relative;
+    height: 100%;    
+    width: 100%;
+    flex: 1;
+    display: flex;   
+}
+
+#main-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Control Elements */
+.controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    margin-top: 20px;
+}
+
+/* Style for the checkbox-group container */
+.checkbox-group {
+    display: flex;
+    gap: 0.5rem;  /* Reduced overall gap */
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* Style for Show Labels and Hide Unselected checkboxes */
+.checkbox-group label:not([style]) {
+    border: none;
+    padding: 0.5rem 0.5rem;  /* Reduced horizontal padding */
+    background: none;
+    border-radius: 3px;  /* Smaller border radius */
+    transition: var(--transition-default);
+    margin-right: -0.75rem;  /* Bring these specific checkboxes even closer */
+    display: inline-flex;
+    align-items: center;
+    height: 32px;  /* Match height with other elements */
+    box-sizing: border-box;
+}
+
+.checkbox-group label:not([style]):hover {
+    background-color: var(--bg-tertiary);
+    transform: translateY(-1px);
+    border: none;
+}
+
+/* Remove the margin from the last borderless checkbox */
+.checkbox-group label:not([style]):last-of-type {
+    margin-right: 0;
+}
+
+.checkbox-group label {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    padding-top: 0.5rem;
+    background-color: var(--bg-secondary);
+    border-radius: var(--rounded-sm);
+    border: 1px solid var(--border-color);
+    transition: var(--transition-default);
+    user-select: none;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.checkbox-group input[type="checkbox"] {
+    margin-right: 5px;
+}
+
+/* Graph Elements */
+.node {
+    cursor: pointer;
+    transition: r 0.3s ease;
+}
+
+.node:hover {
+    r: 8;
+}
+
+.link {
+    stroke-width: 2px;
+    stroke-opacity: 0.6;
+    transition: var(--transition-default);
+}
+
+.link.highlighted,
+.link:hover {
+    stroke: var(--accent-color);
+    stroke-width: 3px;
+    stroke-opacity: 1;
+}
+
+/* Enhanced Tooltip Styles */
+.tooltip {
+    position: absolute;
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    padding: 1rem;
+    border-radius: var(--rounded);
+    font-size: 0.875rem;
+    pointer-events: auto;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    max-width: 1000px;
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+    will-change: transform;
+    transform-origin: top left;
+}
+
+.tooltip::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%) scale(var(--inverse-zoom, 1));
+    transform-origin: bottom;
+    border-width: 0 6px 6px 6px;
+    border-style: solid;
+    border-color: transparent transparent var(--border-color) transparent;
+}
+
+.tooltip.selected-tooltip {
+    border: 1px solid var(--accent-color);
+    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.2);
+    z-index: 1001; /* Always on top */
+}
+
+.tooltip a {
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: var(--transition-default);
+}
+
+.tooltip a:hover {
+    text-decoration: underline;
+}
+
+.tooltip::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 0 6px 6px 6px;
+    border-style: solid;
+    border-color: transparent transparent var(--border-color) transparent;
+}
+
+.tooltip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.tooltip-title {
+    font-weight: 600;
+    color: var(--text-white);
+    font-size: 1rem;
+    margin: 0;
+}
+
+.tooltip-close {
+    cursor: pointer;
+    color: var(--text-primary);
+    opacity: 0.7;
+    transition: var(--transition-default);
+    background: none;
+    border: none;
+    padding: 4px;
+    margin: -4px;
+    border-radius: var(--rounded-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tooltip-close:hover {
+    opacity: 1;
+    color: var(--accent-color);
+    background-color: var(--bg-tertiary);
+}
+
+.tooltip-content {
+    line-height: 1.5;
+}
+
+.tooltip-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0;
+    gap: 1rem;  /* Add space between label and value */
+}
+
+.tooltip-type {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--rounded-sm);
+    color: white;
+    font-weight: 500;
+}
+
+.tooltip-label {
+    color: var(--text-primary);
+    opacity: 0.7;
+}
+
+.tooltip-value {
+    color: var(--text-white);
+    font-weight: 500;
+}
+
+.tooltip-footer {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    opacity: 0.7;
+}
+
+.tooltip.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+#indicators {
+    position: absolute;
+    bottom: 1rem;
+    left: 1rem;
+    width: 300px;
+    height: 60px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-primary);
+    backdrop-filter: blur(8px);
+    border-radius: var(--rounded);
+    padding: 0.5rem;
+    transition: var(--transition-default);
+    display: flex;
+    align-items: center;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+#indicators:hover {
+    border-color: var(--accent-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    background-color: var(--bg-secondary);
+}
+
+.indicator-section {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-default);
+    padding: 0.5rem;
+    gap: 0.25rem;
+    border-radius: var(--rounded-sm);
+}
+
+.indicator-section:hover {
+    transform: translateY(-1px);
+}
+
+.indicator-section:hover .value {
+    color: var(--accent-color);
+}
+
+.indicator-section:hover .label {
+    opacity: 1;
+}
+
+/* For any SVG icons inside indicators */
+.indicator-section svg {
+    transition: var(--transition-default);
+    color: var(--text-primary);
+}
+
+.indicator-section:hover svg {
+    color: var(--accent-color);
+    transform: scale(1.05);
+}
+
+.indicator-divider {
+    background-color: white;
+    opacity: 0.2; 
+
+    width: 1px;
+    height: 43px;
+}
+
+#minimap {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    width: 150px;
+    height: 150px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--rounded);
+    background-color: var(--bg-secondary);
+    backdrop-filter: blur(8px); 
+    overflow: hidden;
+    margin: 0;
+    padding: 2px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); 
+    transition: var(--transition-default);
+}
+
+#minimap:hover {
+    border-color: var(--accent-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+#minimap rect.minimap-view {
+    pointer-events: all;
+    cursor: move;
+    shape-rendering: crispEdges;
+    fill: rgba(55, 65, 81, 0.3);
+    stroke: var(--accent-color);
+    stroke-width: 1.5px;
+}
+
+/* Navigation Elements */
+@keyframes highlight {
+    0% {
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.2);
+        color: var(--accent-color);
+    }
+    100% {
+        border-color: var(--border-color);
+        box-shadow: none;
+        color: var(--text-primary);
+    }
+}
+
+.zoom-controls {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    gap: 0.5rem;
+    z-index: 1000;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.zoom-controls button {
+    width: 2.5rem;
+    height: 2.5rem;
+    cursor: pointer;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--rounded-sm);
+    display: grid;
+    place-items: center;
+    font-size: 1.25rem;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(8px);
+}
+
+.zoom-controls button:hover {
+    background-color: var(--border-color);
+    transform: translateY(-1px);
+    color: var(--text-white);
+}
+
+.zoom-controls button.clicked {
+    animation: highlight 3s ease-out forwards;
+}
+
+.zoom-controls button:active {
+    transform: translateY(1px);
+}
+
+.checkbox-group label:hover {
+    background-color: var(--bg-tertiary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+}
+
+.checkbox-group input[type="checkbox"] {
+    position: relative;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0;
+    cursor: pointer;
+    appearance: none;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--bg-secondary);
+    transition: var(--transition-default);
+}
+
+.checkbox-group input[type="checkbox"]:checked {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+/* Checkmark */
+.checkbox-group input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    color: white;
+    font-size: 0.75rem;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* Loading State */
+@keyframes loadingStripes {
+    0% {
+        background-position: 0 0;
+    }
+    100% {
+        background-position: 20px 0;
+    }
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 0.7;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0.7;
+    }
+}
+
+#loading-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 1000;
+    background-color: var(--bg-secondary);
+    padding: 20px;
+    border-radius: var(--rounded);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+}
+
+.loading-text {
+    color: var(--text-white);
+    margin-bottom: 15px;
+    font-size: 16px;
+    animation: pulse 2s infinite ease-in-out;
+}
+
+.progress-bar {
+    width: 300px;
+    height: 6px;
+    background-color: var(--bg-tertiary);
+    border-radius: var(--rounded);
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(
+        45deg,
+        var(--accent-color) 25%,
+        var(--bg-tertiary) 25%,
+        var(--bg-tertiary) 35%,
+        var(--accent-color) 35%,
+        var(--accent-color) 60%,
+        var(--bg-tertiary) 60%,
+        var(--bg-tertiary) 70%,
+        var(--accent-color) 70%
+    );
+    background-size: 20px 20px;
+    animation: loadingStripes 0.8s linear infinite;
+    transition: width 0.3s ease-out;
+}
+
+#loading-container:hover {
+    border-color: var(--accent-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+#upstream-level, #downstream-level {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0 8px;
+    font-size: 11px;
+    width: 134px;
+    transition: var(--transition-default);
+    margin-top: 0;
+    height: 32px;
+    box-sizing: border-box;
+}
+
+#upstream-level:focus, #downstream-level:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.2);
+}
+
+#upstream-level::placeholder, #downstream-level::placeholder {
+    color: var(--text-primary);
+    opacity: 0.6;
+}
+
+/* Custom styling for number input spinners */
+#upstream-level::-webkit-inner-spin-button,
+#downstream-level::-webkit-inner-spin-button {
+    opacity: 1;
+    background: var(--bg-tertiary);
+    border-left: 1px solid var(--border-color);
+    height: 100%;
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 0 0px;
+    cursor: pointer;
+    transition: var(--transition-default);
+}
+
+/* Hover effect for the spinners */
+#upstream-level::-webkit-inner-spin-button:hover,
+#downstream-level::-webkit-inner-spin-button:hover {
+    background: var(--border-color);
+}
+
+/* Adjust the input padding to accommodate the custom spinner */
+#upstream-level, #downstream-level {
+    padding-right: 20px;
+}
+
+.level-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: 32px;  /* Match height with other elements */
+}
+
+.level-message {
+    position: absolute;
+    top: -25px;  /* Position message above the input */
+    left: 0;     /* Align with the left side of input */
+    font-size: 12px;
+    color: var(--accent-color);
+    opacity: 0;
+    transition: var(--transition-default);
+    white-space: nowrap;
+    pointer-events: none;
+    background-color: var(--bg-secondary);
+    padding: 4px 8px;
+    border-radius: 4px;
+    z-index: 1000;
+}
+
+.level-message.show {
+    opacity: 1;
+}

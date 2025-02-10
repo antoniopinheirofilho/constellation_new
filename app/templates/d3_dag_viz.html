@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" href="https://companieslogo.com/img/orig/DXCO3.SA-ffb8ce94.png?t=1720244491">
+    
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Full Data Lineage</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    
+    <link rel="stylesheet" href="static/styles/main.css">
+
+    <script src="static/js/visibilityManager.js"></script>
+    <script src="static/js/minimap.js"></script>
+    <script src="static/js/mouseInteractions.js"></script>
+    <script src="static/js/simulations.js"></script>
+    <script src="static/js/zoom.js"></script>
+    <script src="static/js/search.js"></script>
+</head>
+<body>
+    
+    <div class="container">
+
+        <h1>Constellation</h1>
+        <input type="text" id="search" placeholder="Search objects...">
+        <div id="suggestions" class="search-results"></div>
+        <div class="controls">
+            <div class="checkbox-group">
+                <label><input type="checkbox" id="showLabels"> Show Labels</label>
+                <label><input type="checkbox" id="hideUnselected"> Hide Unselected Nodes</label>
+                <div class="level-container upstream-container">
+                    <input type="number" id="upstream-level" placeholder="Upstream Level">
+                    <span class="level-message" id="upstream-message"></span>
+                </div>
+                <div class="level-container downstream-container">
+                    <input type="number" id="downstream-level" placeholder="Downstream Level">
+                    <span class="level-message" id="downstream-message"></span>
+                </div>
+
+            </div>
+            <div id="objectTypes" class="checkbox-group"></div>
+        </div>
+        <div id="graph">
+            <svg id="main-svg"></svg>
+            <svg id="minimap"></svg>
+            <div id="indicators">
+                <div class="indicator-section" id="indicator-left"></div>
+                <div class="indicator-divider"></div>
+                <div class="indicator-section" id="indicator-center"></div>
+                <div class="indicator-divider"></div>
+                <div class="indicator-section" id="indicator-right"></div>
+            </div>            
+            <div class="zoom-controls">
+                <button id="zoom-in">+</button>
+                <button id="zoom-out">-</button>
+                <button id="zoom-reset">⟳</button>
+            </div>
+            <div id="loading-container">
+                <div class="loading-text">Loading Graph Data...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const loadingContainer = document.getElementById('loading-container');
+        const progressFill = document.querySelector('.progress-fill');
+
+        // Function to update progress with smoother animation
+        const updateProgress = (() => {
+            let currentProgress = 0;
+            let targetProgress = 0;
+            let progressInterval;
+            let animationFrame;
+
+            const animate = (timestamp) => {
+                const speed = 0.15; // Lower number = smoother but slower animation
+                const delta = (targetProgress - currentProgress) * speed;
+                
+                if (Math.abs(delta) > 0.1) {
+                    currentProgress += delta;
+                    progressFill.style.width = `${currentProgress}%`;
+                    animationFrame = requestAnimationFrame(animate);
+                } else if (currentProgress !== targetProgress) {
+                    currentProgress = targetProgress;
+                    progressFill.style.width = `${currentProgress}%`;
+                }
+            };
+
+            return (progress) => {
+                targetProgress = progress;
+                
+                // Clear any existing animation frame
+                if (animationFrame) {
+                    cancelAnimationFrame(animationFrame);
+                }
+                
+                // Start new animation
+                animationFrame = requestAnimationFrame(animate);
+                
+                // Ensure progress doesn't stall
+                if (progress === 100) {
+                    setTimeout(() => {
+                        loadingContainer.style.display = 'none';
+                    }, 500);
+                }
+            };
+        })();
+
+        // Show loading at start
+        loadingContainer.style.display = 'block';
+        updateProgress(20); // Start at 20%
+
+        fetch('/dag_data')
+            .then(response => response.json())
+            .then(data => {
+                updateProgress(40);
+
+                const graphContainer = document.getElementById('graph');
+                const width = 1700;
+                const height = 1000;
+
+                updateProgress(60);
+
+                const svg = d3.select("#main-svg")
+                    .attr("width", width)
+                    .attr("height", height);
+
+                // Create the main container group for all elements
+                const container = svg.append("g")
+                    .attr("class", "container");
+
+                updateProgress(80);
+
+                // Define arrow marker
+                svg.append("defs").append("marker")
+                    .attr("id", "arrowhead")
+                    .attr("viewBox", "0 -5 10 10")
+                    .attr("refX", 8)
+                    .attr("refY", 0)
+                    .attr("markerWidth", 8)
+                    .attr("markerHeight", 8)
+                    .attr("orient", "auto")
+                    .append("path")
+                    .attr("d", "M0,-5L10,0L0,5")
+                    .attr("fill", "#9c9c9c");
+
+                // Initialize simulation with container
+                const graphSimulation = new GraphSimulation(data, width, height)
+                    .setContainer(container)
+                    .initialize();
+
+                const link = container.append("g")
+                    .selectAll("line")
+                    .data(data.links)
+                    .enter().append("line")
+                    .attr("class", "link")
+                    .attr("stroke", "#999")
+                    .attr("stroke-width", 2)
+                    .attr("marker-end", "url(#arrowhead)");
+
+                const nodeTypes = [...new Set(data.nodes.map(d => d.type))];
+                const colorScale = d3.scaleOrdinal(d3.schemeTableau10).domain(nodeTypes);
+
+                const node = container.append("g")
+                    .selectAll("circle")
+                    .data(data.nodes)
+                    .enter().append("circle")
+                    .attr("class", "node")
+                    .attr("r", 7)
+                    .attr("fill", "#CCCCCC");
+
+                const label = container.append("g")
+                    .selectAll("text")
+                    .data(data.nodes)
+                    .enter().append("text")
+                    .text(d => d.name)
+                    .attr("font-size", 10)
+                    .attr("dx", 12)
+                    .attr("dy", 4)
+                    .style("display", "none")
+                    .attr("fill", "#e0e0e0");
+
+                const tooltip = d3.select("body").append("div")
+                    .attr("class", "tooltip")
+                    .style("opacity", 0);
+
+                const minimap = d3.select("#minimap")
+                    .attr("width", 150)
+                    .attr("height", 150);
+                
+                const indicators = d3.select("#indicators")
+                    .attr("width", 300)
+                    .attr("height", 50);
+
+                // Initialize minimap
+                const minimapInstance = new Minimap(svg, minimap, data, width, height);
+
+                // Create a temporary zoom instance for MouseInteractions
+                const tempZoom = d3.zoom()
+                    .scaleExtent([0.1, 8])
+                    .extent([[0, 0], [width, height]]);
+
+                // Initialize mouse interactions with temporary zoom
+                const mouseInteractions = new MouseInteractions(
+                    svg,
+                    node,
+                    link,
+                    label,
+                    tooltip,
+                    width,
+                    height,
+                    tempZoom,
+                    colorScale,
+                    indicators
+                );
+
+                // Initialize zoom handler with mouseInteractions
+                const zoomHandler = new ZoomHandler(
+                    svg,
+                    container,
+                    node,
+                    link,
+                    label,
+                    minimapInstance,
+                    width,
+                    height,
+                    mouseInteractions
+                );
+
+                zoomHandler.getZoom().on("zoom.tooltip", (event) => {
+                    mouseInteractions.updateTooltipPositionOnZoom(event);
+                });
+
+                const indicators_number = [data.nodes.length, data.links.length, 0];
+                const labels = ["# of nodes", "# of links", "% highlighted"];
+                const formattedIndicators = [
+                    indicators_number[0],
+                    indicators_number[1],
+                    indicators_number[2].toFixed(2)
+                ];
+                mouseInteractions.updateIndicators(formattedIndicators, labels);
+
+                // Initialize search handler
+                const searchHandler = new SearchHandler(data, mouseInteractions, zoomHandler);
+
+                // Run initial simulation ticks
+                graphSimulation.simulation
+                    .alpha(1)
+                    .restart();
+
+                // Run more initial ticks for better layout
+                for (let i = 0; i < 300; i++) {
+                    graphSimulation.simulation.tick();
+                }
+
+                zoomHandler.zoomToFit();
+
+                // Set up the simulation tick callback
+                graphSimulation.setTickCallback(() => {
+                    link
+                        .attr("x1", d => d.source.x)
+                        .attr("y1", d => d.source.y)
+                        .attr("x2", d => d.target.x)
+                        .attr("y2", d => d.target.y);
+
+                    node
+                        .attr("cx", d => d.x)
+                        .attr("cy", d => d.y);
+
+                    label
+                        .attr("x", d => d.x)
+                        .attr("y", d => d.y);
+
+                    minimapInstance.updateMinimap();
+
+                    if (graphSimulation.simulation.alpha() < 0.1) {
+                        updateProgress(100);
+                        setTimeout(() => {
+                            loadingContainer.style.display = 'none';
+                        }, 500);
+                    }
+                });
+
+                // Event handlers
+                d3.select("#showLabels").on("change", function() {
+                    mouseInteractions.toggleLabels(this.checked);
+                });
+                
+                d3.select("#hideUnselected").on("change", function() {
+                    mouseInteractions.setHideUnselectedNodes(this.checked);
+                });
+
+                d3.select("#objectTypes")
+                    .selectAll("label")
+                    .data(nodeTypes)
+                    .enter()
+                    .append("label")
+                    .html(d => `<input type="checkbox" checked> ${d}`)
+                    .style("color", "#e0e0e0")
+                    .style("background-color", d => colorScale(d))
+                    .style("padding", "5px 8px")
+                    .style("border-radius", "3px")
+                    .style("margin-right", "5px")
+                    .on("change", function(event, d) {
+                        const checked = event.target.checked;
+                        mouseInteractions.objectTypeFilter(event, d, checked);
+                });
+
+                // Handle window resizing
+                window.addEventListener('resize', () => {
+                    const width = graphContainer.clientWidth;
+                    const height = graphContainer.clientHeight;
+                    
+                    graphSimulation.updateDimensions(width, height);
+                    minimapInstance.updateDimensions(width, height);
+                    zoomHandler.updateDimensions(width, height);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching data:', error);
+                document.querySelector('.loading-text').textContent = 'Error loading graph data';
+                progressFill.style.backgroundColor = 'var(--accent-color)';
+            });
+    </script>
+</body>
+</html>
