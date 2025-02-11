@@ -29,7 +29,7 @@ def sqlQuery(query: str) -> pd.DataFrame:
         cfg = Config()  # Pull environment variables for auth
         with sql.connect(
             server_hostname=cfg.host,
-            http_path=f"/sql/1.0/warehouses/75fd8278393d07eb",
+            http_path=f"/sql/1.0/warehouses/148ccb90800933a1",
             credentials_provider=lambda: cfg.authenticate
         ) as connection:
             with connection.cursor() as cursor:
