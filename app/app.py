@@ -174,7 +174,6 @@ def get_nodes():
                             COALESCE(total_connections,0) total_connections
                             FROM main.ad_lineage_grafos.lineage_nodes t1
                             LEFT JOIN CONNECTION_BY_NODE t2 ON t1.node = t2.id
-                            WHERE node like "%hive%"
                     """)
                         
 @app.route('/links')
@@ -193,7 +192,6 @@ def get_links():
                 target_node_type as target_type,
                 last_event_date
                 FROM main.ad_lineage_grafos.lineage_links
-                WHERE (source_node like "%hive%" or target_node like "%hive%")
                 """)
 
 @app.route('/dag_data')
