@@ -22,12 +22,16 @@ offset_days = dbutils.widgets.get("offset_days")
 
 # COMMAND ----------
 
+# Verify whether the HMS lineage system table is present
 hms_lineage_table = "system.hms_to_uc_migration.table_access"
 hms_lineage_table_exists = spark.catalog.tableExists(hms_lineage_table)
 
 print(f"HMS lineage table exists: {hms_lineage_table_exists}")
 
 # COMMAND ----------
+
+# If the HMS lineage system table is present, then union its data with the UC lineage system table.
+# Otherwise, only the UC lineage system table will be considered. 
 
 lineage_query = ""
 
@@ -92,7 +96,7 @@ print(lineage_query)
 
 # COMMAND ----------
 
-spark.sql(lineage_query).createOrReplaceTempView("vw_lineage_data")
+spark.sql(f"CREATE OR REPLACE VIEW {catalog}.{schema}.vw_lineage_data_raw AS {lineage_query}")
 
 # COMMAND ----------
 
@@ -139,7 +143,7 @@ spark.sql(f"""
                     END AS entity_path,
                     MAX(event_time) as last_event_time,
                     workspace_id
-                FROM vw_lineage_data
+                FROM {catalog}.{schema}.vw_lineage_data_raw
                 WHERE entity_type IS NOT NULL
                     AND workspace_id = {workspace_id}
                     -- Eliminate operational data
