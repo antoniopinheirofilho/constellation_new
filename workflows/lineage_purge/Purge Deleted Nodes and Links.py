@@ -46,12 +46,37 @@ offset_days = dbutils.widgets.get("offset_days")
 
 # COMMAND ----------
 
+from pyspark.sql import SparkSession
+from concurrent.futures import ThreadPoolExecutor
+
+# Function to list tables in a given schema
+def list_tables(schema_name):
+    tables = spark.sql(f"SHOW TABLES IN hive_metastore.{schema_name}").collect()
+    return [f"hive_metastore.{schema_name}.{t.tableName}" for t in tables]
+
+# Fetch all schemas in Hive Metastore
+schemas = [s.databaseName for s in spark.sql("SHOW SCHEMAS IN hive_metastore").collect()]
+
+# Use ThreadPoolExecutor for parallel execution
+hms_inventory = []
+with ThreadPoolExecutor() as executor:
+    results = executor.map(list_tables, schemas)
+
+# Flatten the results into a single list
+for res in results:
+    hms_inventory.extend(res)
+
+# Convert list to Spark DataFrame
+spark.createDataFrame([(table,) for table in hms_inventory], ["table_id"]).write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.hms_table_inventory")
+
+# COMMAND ----------
 
 spark.sql(f"""
---When it goes to production this should change to use system.information_schema.tables
 CREATE OR REPLACE TABLE {catalog}.{schema}.table_view
 select TRIM(table_catalog ||"."|| table_schema ||"."||table_name) table_id
-from stage.ad_lineage_grafos.tables_information_schema
+from system.information_schema.tables
+union
+select TRIM(table_id) from {catalog}.{schema}.hms_table_inventory
 """)
 
 # COMMAND ----------
