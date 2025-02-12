@@ -171,11 +171,9 @@ operation_metrics_d = lineage_links.history(1).select("operationMetrics").collec
 # Extract the number of deleted rows
 num_deleted_rows = int(operation_metrics_m.get("numTargetRowsDeleted", "0")) + int(operation_metrics_d.get("numDeletedRows", "0"))
 
-print(f"Number of rows deleted: {num_deleted_rows}")
-
 # COMMAND ----------
 
-print(num_deleted_rows)
+print(f"Number of rows deleted: {num_deleted_rows}")
 
 # COMMAND ----------
 
