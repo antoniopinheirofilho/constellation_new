@@ -44,10 +44,12 @@ if hms_lineage_table_exists:
   source_table_catalog,
   source_table_schema,
   source_table_full_name,
+  source_path,
   source_type,
   target_table_catalog,
   target_table_schema,
   target_table_full_name,
+  target_path,
   target_type,
   event_time,
   workspace_id,
@@ -60,10 +62,12 @@ if hms_lineage_table_exists:
   source_table_catalog,
   source_table_schema,
   source_table_full_name,
+  source_path,
   source_type,
   target_table_catalog,
   target_table_schema,
   target_table_full_name,
+  target_path,
   target_type,
   event_time,
   workspace_id,
@@ -80,10 +84,12 @@ else:
   source_table_catalog,
   source_table_schema,
   source_table_full_name,
+  source_path,
   source_type,
   target_table_catalog,
   target_table_schema,
   target_table_full_name,
+  target_path,
   target_type,
   event_time,
   workspace_id,
@@ -114,7 +120,7 @@ spark.sql(f"""
                         ELSE entity_type
                     END AS source_entity_type,
                     entity_id AS source_entity_id,
-                    source_table_full_name,
+                    COALESCE(source_table_full_name, source_path) as source_table_full_name,
                     CASE
                         WHEN source_type IN ('TABLE', 'VIEW', 'PATH', 'STREAMING_TABLE', 'EXTERNAL', 'MANAGED') THEN 'TABLE/VIEW'
                         WHEN source_type = 'DBSQL_DASHBOARD' THEN 'DASHBOARD'
@@ -123,7 +129,7 @@ spark.sql(f"""
                         WHEN source_type IN ('JOB', 'PIPELINE') THEN 'JOB/PIPELINE'
                         ELSE source_type
                     END AS source_type,
-                    target_table_full_name,
+                    COALESCE(target_table_full_name, target_path) as target_table_full_name,
                     CASE
                         WHEN target_type IN ('TABLE', 'VIEW', 'PATH', 'STREAMING_TABLE', 'EXTERNAL', 'MANAGED') THEN 'TABLE/VIEW'
                         WHEN target_type = 'DBSQL_DASHBOARD' THEN 'DASHBOARD'
@@ -147,8 +153,8 @@ spark.sql(f"""
                 WHERE entity_type IS NOT NULL
                     AND workspace_id = {workspace_id}
                     -- Eliminate operational data
-                    AND COALESCE(source_table_catalog, target_table_catalog) != 'system'
-                    AND COALESCE(source_table_schema, target_table_schema) != 'information_schema'
+                    AND COALESCE(source_table_catalog, target_table_catalog, 'unknown') != 'system'
+                    AND COALESCE(source_table_schema, target_table_schema, 'unknown') != 'information_schema'
                     AND event_date >= CURRENT_DATE() - INTERVAL '{offset_days}' DAYS
                 GROUP BY ALL
             )
