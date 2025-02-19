@@ -21,24 +21,6 @@ schema = dbutils.widgets.get("schema")
 # Obtain the number of days to offset for filtering events in the query
 offset_days = dbutils.widgets.get("offset_days")
 
-
-
-# # Retrieve workspace URL and ID from task values for dynamic query construction
-# # workspace_url = dbutils.jobs.taskValues.get(taskKey='functions_and_configuration_parameters', key="workspace_url")
-# from dbruntime.databricks_repl_context import get_context
-
-# # workspace_id = dbutils.jobs.taskValues.get(taskKey='functions_and_configuration_parameters', key="workspace_id")
-# workspace_url = spark.conf.get("spark.databricks.workspaceUrl")
-# workspace_id = get_context().workspaceId
-# # Fetch catalog and schema names from notebook widgets for view creation
-# # catalog = dbutils.widgets.get("catalog")
-# # schema = dbutils.widgets.get("schema")
-# catalog = "stage"
-# schema = "ad_lineage_grafos"
-# # Obtain the number of days to offset for filtering events in the query
-# # offset_days = dbutils.widgets.get("offset_days")
-# offset_days = 365
-
 # COMMAND ----------
 
 # MAGIC %md
@@ -67,7 +49,9 @@ for res in results:
     hms_inventory.extend(res)
 
 # Convert list to Spark DataFrame
-spark.createDataFrame([(table,) for table in hms_inventory], ["table_id"]).write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.hms_table_inventory")
+df_hms = spark.createDataFrame(hms_inventory)
+df_hms = df_hms.withColumn("last_altered", lit(datetime.max)) # Workaround since HMS doesn't display the last altered data. This will ensure that we always include all existing HMS tables
+df_hms.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.hms_table_inventory")
 
 # COMMAND ----------
 
@@ -76,7 +60,8 @@ CREATE OR REPLACE TABLE {catalog}.{schema}.table_view
 select TRIM(table_catalog ||"."|| table_schema ||"."||table_name) table_id
 from system.information_schema.tables
 union
-select TRIM(table_id) from {catalog}.{schema}.hms_table_inventory
+select TRIM(table_catalog ||"."|| table_schema ||"."||table_name) table_id 
+from {catalog}.{schema}.hms_table_inventory
 """)
 
 # COMMAND ----------

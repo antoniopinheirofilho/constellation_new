@@ -24,6 +24,38 @@ offset_days = dbutils.widgets.get("offset_days")
 
 # COMMAND ----------
 
+# DBTITLE 1,Crawl HMS
+# Since system.information_schema.tables does not contain HMS records, we need to manually crawl HMS to build the list of nodes
+
+from pyspark.sql import SparkSession
+from concurrent.futures import ThreadPoolExecutor
+from pyspark.sql.functions import lit
+from datetime import datetime
+
+# Function to list tables in a given schema
+def list_tables(schema_name):
+    tables = spark.sql(f"SHOW TABLES IN hive_metastore.{schema_name}").collect()
+    return [{"table_catalog": "hive_metastore", "table_schema": schema_name, "table_name": t.tableName} for t in tables]
+
+# Fetch all schemas in Hive Metastore
+schemas = [s.databaseName for s in spark.sql("SHOW SCHEMAS IN hive_metastore").collect()]
+
+# Use ThreadPoolExecutor for parallel execution
+hms_inventory = []
+with ThreadPoolExecutor() as executor:
+    results = executor.map(list_tables, schemas)
+
+# Flatten the results into a single list
+for res in results:
+    hms_inventory.extend(res)
+
+# Convert list to Spark DataFrame
+df_hms = spark.createDataFrame(hms_inventory)
+df_hms = df_hms.withColumn("last_altered", lit(datetime.max)) # Workaround since HMS doesn't display the last altered data. This will ensure that we always include all existing HMS tables
+df_hms.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.hms_table_inventory")
+
+# COMMAND ----------
+
 nodes_df = spark.sql(f"""
     WITH base_nodes AS (
         WITH nodes_with_event AS (
@@ -44,7 +76,7 @@ nodes_df = spark.sql(f"""
 
         UNION
 
-        -- Unite nodes that had an event and also tables with no events at all (lonely nodes)
+        -- Unite nodes that had an event and also tables (UC) with no events at all (lonely nodes)
         SELECT
             CONCAT(t.table_catalog, '.', t.table_schema, '.', t.table_name) AS node,
             'TABLE/VIEW' AS node_type,
@@ -58,6 +90,19 @@ nodes_df = spark.sql(f"""
             AND t.table_catalog != 'system'
             AND t.table_schema != 'information_schema'
             AND DATE(t.last_altered) >= CURRENT_DATE() - INTERVAL '{offset_days}' DAYS
+
+        UNION
+
+        -- Unite nodes that had an event and also tables (HMS) with no events at all (lonely nodes)
+        SELECT
+            CONCAT(t.table_catalog, '.', t.table_schema, '.', t.table_name) AS node,
+            'TABLE/VIEW' AS node_type,
+            CONCAT('https://{workspace_url}/explore/data/', t.table_catalog, '/', t.table_schema, '/', t.table_name) AS entity_path, 
+            DATE(t.last_altered) AS last_event_date
+        FROM {catalog}.{schema}.hms_table_inventory t
+        LEFT JOIN nodes_with_event nwe
+            ON CONCAT(t.table_catalog, '.', t.table_schema, '.', t.table_name) = nwe.node
+        WHERE nwe.node IS NULL
     )
     SELECT
         bn.node,
