@@ -145,9 +145,9 @@ operation_metrics_m = lineage_links.history(1).select("operationMetrics").collec
 iperation_metrics_m = int(operation_metrics_m.get("numTargetRowsDeleted", "0"))
 
 delete_result_table_views = lineage_links.delete(
-    f"""(source_node_type = 'TABLE/VIEW' AND source_node NOT IN ( SELECT table_id 
+    f"""(source_node_type = 'TABLE/VIEW/PATH' AND source_node NOT IN ( SELECT table_id 
                             FROM {catalog}.{schema}.table_view))
-         OR (target_node_type = 'TABLE/VIEW' AND target_node NOT IN ( SELECT table_id 
+         OR (target_node_type = 'TABLE/VIEW/PATH' AND target_node NOT IN ( SELECT table_id 
                             FROM {catalog}.{schema}.table_view))
     """
 )
@@ -182,7 +182,7 @@ operation_metrics_m = lineage_nodes.history(1).select("operationMetrics").collec
 iperation_metrics_m = int(operation_metrics_m.get("numTargetRowsDeleted", "0"))
 
 delete_result_table_views = lineage_nodes.delete(
-    f"""(node_type = 'TABLE/VIEW' AND node NOT IN (SELECT table_id 
+    f"""(node_type = 'TABLE/VIEW/PATH' AND node NOT IN (SELECT table_id 
                             FROM {catalog}.{schema}.table_view))
      """)
 operation_metrics_d = lineage_nodes.history(1).select("operationMetrics").collect()[0][0]

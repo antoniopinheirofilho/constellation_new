@@ -112,7 +112,7 @@ spark.sql(f"""
             WITH internal_tables_lineages AS (
                 SELECT
                      CASE
-                        WHEN entity_type IN ('TABLE', 'VIEW', 'PATH', 'STREAMING_TABLE', 'EXTERNAL', 'MANAGED') THEN 'TABLE/VIEW'
+                        WHEN entity_type IN ('TABLE', 'VIEW', 'PATH', 'STREAMING_TABLE', 'EXTERNAL', 'MANAGED') THEN 'TABLE/VIEW/PATH'
                         WHEN entity_type = 'DBSQL_DASHBOARD' THEN 'DASHBOARD'
                         WHEN entity_type = 'DASHBOARD_V3' THEN 'DASHBOARD'
                         WHEN entity_type = 'DBSQL_QUERY' THEN 'QUERY'
@@ -122,7 +122,7 @@ spark.sql(f"""
                     entity_id AS source_entity_id,
                     COALESCE(source_table_full_name, source_path) as source_table_full_name,
                     CASE
-                        WHEN source_type IN ('TABLE', 'VIEW', 'PATH', 'STREAMING_TABLE', 'EXTERNAL', 'MANAGED') THEN 'TABLE/VIEW'
+                        WHEN source_type IN ('TABLE', 'VIEW', 'PATH', 'STREAMING_TABLE', 'EXTERNAL', 'MANAGED') THEN 'TABLE/VIEW/PATH'
                         WHEN source_type = 'DBSQL_DASHBOARD' THEN 'DASHBOARD'
                         WHEN source_type = 'DASHBOARD_V3' THEN 'DASHBOARD'
                         WHEN source_type = 'DBSQL_QUERY' THEN 'QUERY'
@@ -131,7 +131,7 @@ spark.sql(f"""
                     END AS source_type,
                     COALESCE(target_table_full_name, target_path) as target_table_full_name,
                     CASE
-                        WHEN target_type IN ('TABLE', 'VIEW', 'PATH', 'STREAMING_TABLE', 'EXTERNAL', 'MANAGED') THEN 'TABLE/VIEW'
+                        WHEN target_type IN ('TABLE', 'VIEW', 'PATH', 'STREAMING_TABLE', 'EXTERNAL', 'MANAGED') THEN 'TABLE/VIEW/PATH'
                         WHEN target_type = 'DBSQL_DASHBOARD' THEN 'DASHBOARD'
                         WHEN target_type = 'DASHBOARD_V3' THEN 'DASHBOARD'
                         WHEN target_type = 'DBSQL_QUERY' THEN 'QUERY'

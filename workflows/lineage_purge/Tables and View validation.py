@@ -24,7 +24,7 @@ non_compliant = spark.sql(f"""
             SELECT * from stage.ad_lineage_grafos.lineage_nodes ln
             LEFT ANTI JOIN {catalog}.{schema}.table_view tv
             ON ln.node = tv.table_id
-            WHERE node_type = "TABLE/VIEW"
+            WHERE node_type = "TABLE/VIEW/PATH"
             """)
 
 non_compliant.count()

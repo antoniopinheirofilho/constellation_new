@@ -79,7 +79,7 @@ nodes_df = spark.sql(f"""
         -- Unite nodes that had an event and also tables (UC) with no events at all (lonely nodes)
         SELECT
             CONCAT(t.table_catalog, '.', t.table_schema, '.', t.table_name) AS node,
-            'TABLE/VIEW' AS node_type,
+            'TABLE/VIEW/PATH' AS node_type,
             CONCAT('https://{workspace_url}/explore/data/', t.table_catalog, '/', t.table_schema, '/', t.table_name) AS entity_path, 
             DATE(t.last_altered) AS last_event_date
         FROM system.information_schema.tables t
@@ -96,7 +96,7 @@ nodes_df = spark.sql(f"""
         -- Unite nodes that had an event and also tables (HMS) with no events at all (lonely nodes)
         SELECT
             CONCAT(t.table_catalog, '.', t.table_schema, '.', t.table_name) AS node,
-            'TABLE/VIEW' AS node_type,
+            'TABLE/VIEW/PATH' AS node_type,
             CONCAT('https://{workspace_url}/explore/data/', t.table_catalog, '/', t.table_schema, '/', t.table_name) AS entity_path, 
             DATE(t.last_altered) AS last_event_date
         FROM {catalog}.{schema}.hms_table_inventory t

@@ -36,7 +36,7 @@ spark.sql(f"""
             CONCAT('https://{workspace_url}/explore/data/', REPLACE(source_object, '.', '/')) AS entity_path, 
             last_event_time
         FROM {catalog}.{schema}.vw_sources_targets_fill
-        WHERE source_type = 'TABLE/VIEW'
+        WHERE source_type = 'TABLE/VIEW/PATH'
         AND source_object IS NOT NULL
 
         UNION ALL
@@ -48,7 +48,7 @@ spark.sql(f"""
             CONCAT('https://{workspace_url}/explore/data/', REPLACE(target_object, '.', '/')) AS entity_path, 
             last_event_time
         FROM {catalog}.{schema}.vw_sources_targets_fill
-        WHERE target_type = 'TABLE/VIEW'
+        WHERE target_type = 'TABLE/VIEW/PATH'
         AND target_object IS NOT NULL
 
         UNION ALL
@@ -59,7 +59,7 @@ spark.sql(f"""
             entity_path, 
             last_event_time
         FROM {catalog}.{schema}.vw_sources_targets_fill
-        WHERE source_type != 'TABLE/VIEW'
+        WHERE source_type != 'TABLE/VIEW/PATH'
         AND source_object IS NOT NULL
 
         UNION ALL
@@ -70,7 +70,7 @@ spark.sql(f"""
             entity_path, 
             last_event_time
         FROM {catalog}.{schema}.vw_sources_targets_fill
-        WHERE target_type != 'TABLE/VIEW'
+        WHERE target_type != 'TABLE/VIEW/PATH'
         AND target_object IS NOT NULL
     )
     GROUP BY node, node_type, entity_path
