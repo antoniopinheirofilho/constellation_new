@@ -63,7 +63,8 @@ nodes_df = spark.sql(f"""
                 node,
                 node_type,
                 entity_path,
-                DATE(last_event_time) AS last_event_date
+                DATE(last_event_time) AS last_event_date,
+                lineage_source_table
             FROM {catalog}.{schema}.vw_objects_union
             GROUP BY ALL
         )
@@ -71,7 +72,8 @@ nodes_df = spark.sql(f"""
             node,
             node_type,
             entity_path,
-            last_event_date
+            last_event_date,
+            lineage_source_table
         FROM nodes_with_event
 
         UNION
@@ -81,8 +83,10 @@ nodes_df = spark.sql(f"""
             CONCAT(t.table_catalog, '.', t.table_schema, '.', t.table_name) AS node,
             'TABLE/VIEW/PATH' AS node_type,
             CONCAT('https://{workspace_url}/explore/data/', t.table_catalog, '/', t.table_schema, '/', t.table_name) AS entity_path, 
-            DATE(t.last_altered) AS last_event_date
+            DATE(t.last_altered) AS last_event_date,
+            'table_lineage' as lineage_source_table
         FROM system.information_schema.tables t
+
         LEFT JOIN nodes_with_event nwe
             ON CONCAT(t.table_catalog, '.', t.table_schema, '.', t.table_name) = nwe.node
         WHERE nwe.node IS NULL
@@ -98,7 +102,8 @@ nodes_df = spark.sql(f"""
             CONCAT(t.table_catalog, '.', t.table_schema, '.', t.table_name) AS node,
             'TABLE/VIEW/PATH' AS node_type,
             CONCAT('https://{workspace_url}/explore/data/', t.table_catalog, '/', t.table_schema, '/', t.table_name) AS entity_path, 
-            DATE(t.last_altered) AS last_event_date
+            DATE(t.last_altered) AS last_event_date,
+            'hms_table_lineage' AS lineage_source_table
         FROM {catalog}.{schema}.hms_table_inventory t
         LEFT JOIN nodes_with_event nwe
             ON CONCAT(t.table_catalog, '.', t.table_schema, '.', t.table_name) = nwe.node
@@ -108,7 +113,8 @@ nodes_df = spark.sql(f"""
         bn.node,
         bn.node_type,
         bn.entity_path,
-        bn.last_event_date
+        bn.last_event_date,
+        bn.lineage_source_table
     FROM base_nodes bn
     LEFT JOIN {catalog}.{schema}.lineage_links ls
         ON bn.node = ls.source_node
@@ -141,7 +147,7 @@ else:
     merge_result = lineage_nodes_table.alias('lineage_nodes') \
         .merge(
             nodes_df.alias('new_nodes'),
-            'lineage_nodes.node = new_nodes.node AND lineage_nodes.node_type = new_nodes.node_type AND lineage_nodes.entity_path = new_nodes.entity_path'
+            'lineage_nodes.node = new_nodes.node AND lineage_nodes.node_type = new_nodes.node_type AND lineage_nodes.entity_path = new_nodes.entity_path AND lineage_nodes.lineage_source_table = new_nodes.lineage_source_table'
         ) \
         .whenMatchedUpdateAll( # In case the new node is more recent, update the existing one
             condition='lineage_nodes.last_event_date <= new_nodes.last_event_date'
@@ -150,7 +156,8 @@ else:
             "node": "new_nodes.node",
             "node_type": "new_nodes.node_type",
             "entity_path": "new_nodes.entity_path",
-            "last_event_date": "new_nodes.last_event_date"
+            "last_event_date": "new_nodes.last_event_date",
+            "lineage_source_table": "lineage_source_table"
         }) \
         .execute()
 

@@ -53,8 +53,11 @@ if hms_lineage_table_exists:
   target_type,
   event_time,
   workspace_id,
-  event_date
+  event_date,
+  'table_lineage' as lineage_source_table
+
   from system.access.table_lineage
+
   union all
   select
   entity_type,
@@ -71,7 +74,9 @@ if hms_lineage_table_exists:
   target_type,
   event_time,
   workspace_id,
-  event_date from system.hms_to_uc_migration.table_access
+  event_date,
+  CAST('hms_table_lineage' as STRING) as lineage_source_table
+  from system.hms_to_uc_migration.table_access
   
   """
 else:
@@ -93,7 +98,8 @@ else:
   target_type,
   event_time,
   workspace_id,
-  event_date
+  event_date,
+  CAST('table_lineage' as STRING) as lineage_source_table
   from system.access.table_lineage
   
   """
@@ -148,7 +154,8 @@ spark.sql(f"""
                         WHEN entity_type = 'DBSQL_DASHBOARD' THEN 'https://{workspace_url}/sql/dashboards/' || entity_id
                     END AS entity_path,
                     MAX(event_time) as last_event_time,
-                    workspace_id
+                    workspace_id,
+                    lineage_source_table
                 FROM {catalog}.{schema}.vw_lineage_data_raw
                 WHERE entity_type IS NOT NULL
                     AND workspace_id = {workspace_id}
@@ -166,7 +173,8 @@ spark.sql(f"""
                    target_table_full_name as target_object,
                    entity_path,
                    last_event_time,
-                   workspace_id
+                   workspace_id,
+                   lineage_source_table
             FROM internal_tables_lineages
 
             UNION
@@ -178,7 +186,8 @@ spark.sql(f"""
                    source_entity_type || '-' || source_entity_id AS target_object,  -- Adding the entity type with its ID to avoid collision
                    entity_path,
                    last_event_time,
-                   workspace_id
+                   workspace_id,
+                   lineage_source_table
             FROM internal_tables_lineages
 
         )
@@ -189,7 +198,8 @@ spark.sql(f"""
             target_type,
             entity_path,
             last_event_time,
-            workspace_id
+            workspace_id,
+            lineage_source_table
           FROM tables_lineages
             WHERE source_object IS NOT NULL AND target_object IS NOT NULL AND source_type IS NOT NULL AND target_type IS NOT NULL
 """)

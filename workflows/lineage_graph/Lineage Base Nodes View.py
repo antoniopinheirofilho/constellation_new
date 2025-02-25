@@ -24,7 +24,7 @@ schema = dbutils.widgets.get("schema")
 spark.sql(f"""
     CREATE OR REPLACE VIEW {catalog}.{schema}.vw_objects_union AS
 
-    SELECT node, node_type, entity_path, MAX(last_event_time) AS last_event_time
+    SELECT node, node_type, entity_path, MAX(last_event_time) AS last_event_time, lineage_source_table
     FROM (
         -- Unite all the sources and targets, each one in a separate row
         -- Tables
@@ -34,7 +34,8 @@ spark.sql(f"""
             source_type AS node_type, 
             -- Build table link for catalog access
             CONCAT('https://{workspace_url}/explore/data/', REPLACE(source_object, '.', '/')) AS entity_path, 
-            last_event_time
+            last_event_time,
+            lineage_source_table
         FROM {catalog}.{schema}.vw_sources_targets_fill
         WHERE source_type = 'TABLE/VIEW/PATH'
         AND source_object IS NOT NULL
@@ -46,7 +47,8 @@ spark.sql(f"""
             target_type AS node_type, 
             -- Build table link for catalog access
             CONCAT('https://{workspace_url}/explore/data/', REPLACE(target_object, '.', '/')) AS entity_path, 
-            last_event_time
+            last_event_time,
+            lineage_source_table
         FROM {catalog}.{schema}.vw_sources_targets_fill
         WHERE target_type = 'TABLE/VIEW/PATH'
         AND target_object IS NOT NULL
@@ -57,7 +59,8 @@ spark.sql(f"""
             source_object AS node, 
             source_type AS node_type, 
             entity_path, 
-            last_event_time
+            last_event_time,
+            lineage_source_table
         FROM {catalog}.{schema}.vw_sources_targets_fill
         WHERE source_type != 'TABLE/VIEW/PATH'
         AND source_object IS NOT NULL
@@ -68,10 +71,11 @@ spark.sql(f"""
             target_object AS node, 
             target_type AS node_type, 
             entity_path, 
-            last_event_time
+            last_event_time,
+            lineage_source_table
         FROM {catalog}.{schema}.vw_sources_targets_fill
         WHERE target_type != 'TABLE/VIEW/PATH'
         AND target_object IS NOT NULL
     )
-    GROUP BY node, node_type, entity_path
+    GROUP BY node, node_type, entity_path, lineage_source_table
 """)
