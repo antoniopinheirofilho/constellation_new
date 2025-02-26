@@ -98,7 +98,7 @@ def subgraph(node_id: str):
     Returns:
         str: Rendered HTML template for the subgraph page.
     """
-    return render_template('dexco_d3_dag_viz_subgraph.html')
+    return render_template('d3_dag_viz_subgraph.html')
 
 @app.route('/search/<node_id>')
 def search(node_id: str):
