@@ -8,27 +8,38 @@
     <title>Full Data Lineage</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles/main.css') }}">
-    <script src="{{ url_for('static', filename='js/minimap.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/interactions.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/simulations.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/zoom.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/search.js') }}"></script>
+    <link rel="stylesheet" href="static/styles/main.css">
+
+    <script src="static/js/visibilityManager.js"></script>
+    <script src="static/js/minimap.js"></script>
+    <script src="static/js/mouseInteractions.js"></script>
+    <script src="static/js/simulations.js"></script>
+    <script src="static/js/zoom.js"></script>
+    <script src="static/js/search.js"></script>
 </head>
 <body>
     <div class="container">
         <h1>Constellation</h1>
-        <h3 style="text-align: center; margin-top: -10px; margin-bottom: 20px;">subgraphs</h3>
         <input type="text" id="search" placeholder="Search objects...">
         <div id="suggestions" class="search-results"></div>
         <div class="controls">
             <div class="checkbox-group">
                 <label><input type="checkbox" id="showLabels"> Show Labels</label>
                 <label><input type="checkbox" id="hideUnselected"> Hide Unselected Nodes</label>
-                <input type="number" min="0" id="upstream-level" placeholder="Upstream level">
-                <input type="number" min="0" id="downstream-level" placeholder="Downstream level">
-
+                <div class="level-container upstream-container">
+                    <input type="number" id="upstream-level" placeholder="Upstream Level">
+                    <span class="level-message" id="upstream-message"></span>
+                </div>
+                <div class="level-container downstream-container">
+                    <input type="number" id="downstream-level" placeholder="Downstream Level">
+                    <span class="level-message" id="downstream-message"></span>
+                </div>
             </div>
+            <select id="lineageSource">
+                <option value="hms_table_lineage">HMS Table Lineage</option>
+                <option value="table_lineage">Table Lineage</option>
+                <option value="all">All</option>
+            </select>
             <div id="objectTypes" class="checkbox-group"></div>
         </div>
         <div id="graph">
@@ -54,244 +65,278 @@
             </div>
         </div>
     </div>
+
     <script>
         const loadingContainer = document.getElementById('loading-container');
         const progressFill = document.querySelector('.progress-fill');
+        const lineageSourceSelect = document.getElementById('lineageSource');
 
-        const updateProgress = (percent) => {
-            progressFill.style.width = `${percent}%`;
-        };
+        // Function to update progress with smoother animation
+        const updateProgress = (() => {
+            let currentProgress = 0;
+            let targetProgress = 0;
+            let progressInterval;
+            let animationFrame;
 
-        loadingContainer.style.display = 'block';
-        updateProgress(20);
-
-        const url = new URL(window.location.href);
-        const nodeId = url.pathname.split('/').pop();
-        console.log(url)
-        console.log(nodeId)
-        fetch(`/search/${nodeId}`)
-            .then(response => response.json())
-            .then(data => {
-                updateProgress(20);
-
-                const graphContainer = document.getElementById('graph');
-                const width = 1700;
-                const height = 1000;
-
-                updateProgress(40);
-
-                const svg = d3.select("#main-svg")
-                    .attr("width", width)
-                    .attr("height", height);
-
-                // Create the main container group for all elements
-                const container = svg.append("g")
-                    .attr("class", "container");
-
-                updateProgress(60);
-
-                // Define arrow marker
-                svg.append("defs").append("marker")
-                    .attr("id", "arrowhead")
-                    .attr("viewBox", "0 -5 10 10")
-                    .attr("refX", 8)
-                    .attr("refY", 0)
-                    .attr("markerWidth", 8)
-                    .attr("markerHeight", 8)
-                    .attr("orient", "auto")
-                    .append("path")
-                    .attr("d", "M0,-5L10,0L0,5")
-                    .attr("fill", "#9c9c9c");
-
-                // Initialize simulation with container
-                const graphSimulation = new GraphSimulation(data, width, height)
-                    .setContainer(container)
-                    .initialize();
-
-                updateProgress(80);
-
-                // Create all visual elements within the container
-                const link = container.append("g")
-                    .selectAll("line")
-                    .data(data.links)
-                    .enter().append("line")
-                    .attr("class", "link")
-                    .attr("stroke", "#999")
-                    .attr("stroke-width", 2)
-                    .attr("marker-end", "url(#arrowhead)");
-
-                const nodeTypes = [...new Set(data.nodes.map(d => d.type))];
-                const colorScale = d3.scaleOrdinal(d3.schemeTableau10).domain(nodeTypes);
-
-                const node = container.append("g")
-                    .selectAll("circle")
-                    .data(data.nodes)
-                    .enter().append("circle")
-                    .attr("class", "node")
-                    .attr("r", 7)
-                    .attr("fill", "#CCCCCC");
-
-                const label = container.append("g")
-                    .selectAll("text")
-                    .data(data.nodes)
-                    .enter().append("text")
-                    .text(d => d.name)
-                    .attr("font-size", 10)
-                    .attr("dx", 12)
-                    .attr("dy", 4)
-                    .style("display", "none")
-                    .attr("fill", "#e0e0e0");
-
-                const tooltip = d3.select("body").append("div")
-                    .attr("class", "tooltip")
-                    .style("opacity", 0);
-
-                const minimap = d3.select("#minimap")
-                    .attr("width", 150)
-                    .attr("height", 150);
-                const indicators = d3.select("#indicators")
-                    .attr("width", 300)
-                    .attr("height", 50);
-
-                // Initialize minimap with new container reference
-                const minimapInstance = new Minimap(svg, minimap, data, width, height);
-
-                // Initialize zoom handler with container
-                const zoomHandler = new ZoomHandler(
-                    svg,
-                    container,
-                    node,
-                    link,
-                    label,
-                    minimapInstance,
-                    width,
-                    height
-                );
-
-                // Initialize mouse interactions
-                const mouseInteractions = new MouseInteractions(
-                    svg,
-                    node,
-                    link,
-                    label,
-                    tooltip,
-                    width,
-                    height,
-                    zoomHandler.getZoom(),
-                    colorScale,
-                    indicators
-                );
-                const indicators_number = [data.nodes.length,data.links.length, 0]
-                const labels = ["nodes N°", "links N°","Highlights %"]
-                mouseInteractions.updateIndicators(indicators_number,labels)
-                // Initialize search handler
-                const searchHandler = new SearchHandler(data, mouseInteractions, zoomHandler);
-
-                // Run initial simulation ticks
-                graphSimulation.simulation
-                    .alpha(1)
-                    .restart();
-
-                // Run more initial ticks for better layout
-                for (let i = 0; i < 300; i++) {
-                    graphSimulation.simulation.tick();
-                }
-
-                zoomHandler.zoomToFit();
-
-                // Set up the simulation tick callback
-                graphSimulation.setTickCallback(() => {
-                    link
-                        .attr("x1", d => d.source.x)
-                        .attr("y1", d => d.source.y)
-                        .attr("x2", d => d.target.x)
-                        .attr("y2", d => d.target.y);
-
-                    node
-                        .attr("cx", d => d.x)
-                        .attr("cy", d => d.y);
-
-                    label
-                        .attr("x", d => d.x)
-                        .attr("y", d => d.y);
-
-                    minimapInstance.updateMinimap();
-
-                    if (graphSimulation.simulation.alpha() < 0.1) {
-                        updateProgress(100);
-                        setTimeout(() => {
-                            loadingContainer.style.display = 'none';
-                        }, 500);
-                    }
-                });
-                // Event handlers
-                d3.select("#showLabels").on("change", function() {
-                const showLabels = this.checked;
-                const activeTypes = new Set();
+            const animate = (timestamp) => {
+                const speed = 0.15; // Lower number = smoother but slower animation
+                const delta = (targetProgress - currentProgress) * speed;
                 
-                // Determine which types are currently active
-                d3.select("#objectTypes").selectAll("input")
-                    .each(function(d) {
-                        if (this.checked) activeTypes.add(d);
+                if (Math.abs(delta) > 0.1) {
+                    currentProgress += delta;
+                    progressFill.style.width = `${currentProgress}%`;
+                    animationFrame = requestAnimationFrame(animate);
+                } else if (currentProgress !== targetProgress) {
+                    currentProgress = targetProgress;
+                    progressFill.style.width = `${currentProgress}%`;
+                }
+            };
+
+            return (progress) => {
+                targetProgress = progress;
+                
+                // Clear any existing animation frame
+                if (animationFrame) {
+                    cancelAnimationFrame(animationFrame);
+                }
+                
+                // Start new animation
+                animationFrame = requestAnimationFrame(animate);
+                
+                // Ensure progress doesn't stall
+                if (progress === 100) {
+                    setTimeout(() => {
+                        loadingContainer.style.display = 'none';
+                    }, 500);
+                }
+            };
+        })();
+
+        function fetchData() {
+            const selectedSource = lineageSourceSelect.value;
+            const url = `/dag_data?lineage_source_table=${selectedSource}`;
+
+            loadingContainer.style.display = 'block';
+            updateProgress(20);
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    updateProgress(40);
+
+                    const graphContainer = document.getElementById('graph');
+                    const width = 1700;
+                    const height = 1000;
+
+                    updateProgress(60);
+
+                    const svg = d3.select("#main-svg")
+                        .attr("width", width)
+                        .attr("height", height);
+
+                    // Create the main container group for all elements
+                    const container = svg.append("g")
+                        .attr("class", "container");
+
+                    updateProgress(80);
+
+                    // Define arrow marker
+                    svg.append("defs").append("marker")
+                        .attr("id", "arrowhead")
+                        .attr("viewBox", "0 -5 10 10")
+                        .attr("refX", 8)
+                        .attr("refY", 0)
+                        .attr("markerWidth", 8)
+                        .attr("markerHeight", 8)
+                        .attr("orient", "auto")
+                        .append("path")
+                        .attr("d", "M0,-5L10,0L0,5")
+                        .attr("fill", "#9c9c9c");
+
+                    // Initialize simulation with container
+                    const graphSimulation = new GraphSimulation(data, width, height)
+                        .setContainer(container)
+                        .initialize();
+
+                    const link = container.append("g")
+                        .selectAll("line")
+                        .data(data.links)
+                        .enter().append("line")
+                        .attr("class", "link")
+                        .attr("stroke", "#999")
+                        .attr("stroke-width", 2)
+                        .attr("marker-end", "url(#arrowhead)");
+
+                    const nodeTypes = [...new Set(data.nodes.map(d => d.type))];
+                    const colorScale = d3.scaleOrdinal(d3.schemeTableau10).domain(nodeTypes);
+
+                    const node = container.append("g")
+                        .selectAll("circle")
+                        .data(data.nodes)
+                        .enter().append("circle")
+                        .attr("class", "node")
+                        .attr("r", 7)
+                        .attr("fill", "#CCCCCC");
+
+                    const label = container.append("g")
+                        .selectAll("text")
+                        .data(data.nodes)
+                        .enter().append("text")
+                        .text(d => d.name)
+                        .attr("font-size", 10)
+                        .attr("dx", 12)
+                        .attr("dy", 4)
+                        .style("display", "none")
+                        .attr("fill", "#e0e0e0");
+
+                    const tooltip = d3.select("body").append("div")
+                        .attr("class", "tooltip")
+                        .style("opacity", 0);
+
+                    const minimap = d3.select("#minimap")
+                        .attr("width", 150)
+                        .attr("height", 150);
+                    
+                    const indicators = d3.select("#indicators")
+                        .attr("width", 300)
+                        .attr("height", 50);
+
+                    // Initialize minimap
+                    const minimapInstance = new Minimap(svg, minimap, data, width, height);
+
+                    // Create a temporary zoom instance for MouseInteractions
+                    const tempZoom = d3.zoom()
+                        .scaleExtent([0.1, 8])
+                        .extent([[0, 0], [width, height]]);
+
+                    // Initialize mouse interactions with temporary zoom
+                    const mouseInteractions = new MouseInteractions(
+                        svg,
+                        node,
+                        link,
+                        label,
+                        tooltip,
+                        width,
+                        height,
+                        tempZoom,
+                        colorScale,
+                        indicators
+                    );
+
+                    // Initialize zoom handler with mouseInteractions
+                    const zoomHandler = new ZoomHandler(
+                        svg,
+                        container,
+                        node,
+                        link,
+                        label,
+                        minimapInstance,
+                        width,
+                        height,
+                        mouseInteractions
+                    );
+
+                    zoomHandler.getZoom().on("zoom.tooltip", (event) => {
+                        mouseInteractions.updateTooltipPositionOnZoom(event);
                     });
 
-                label.style("display", function(d) {
-                    // Check if the node's type is active
-                    if (!activeTypes.has(d.type)) return "none";
+                    const indicators_number = [data.nodes.length, data.links.length, 0];
+                    const labels = ["# of nodes", "# of links", "% highlighted"];
+                    const formattedIndicators = [
+                        indicators_number[0],
+                        indicators_number[1],
+                        indicators_number[2].toFixed(2)
+                    ];
+                    mouseInteractions.updateIndicators(formattedIndicators, labels);
 
-                    if (showLabels) {
-                        if (!mouseInteractions.selectedNode) {
-                            return "block";
-                        } else {
-                            return mouseInteractions.connectedNodes.has(d.id) ? "block" : "none";
-                        }
-                    } else {
-                        return "none";
+                    // Initialize search handler
+                    const searchHandler = new SearchHandler(data, mouseInteractions, zoomHandler);
+
+                    // Run initial simulation ticks
+                    graphSimulation.simulation
+                        .alpha(1)
+                        .restart();
+
+                    // Run more initial ticks for better layout
+                    for (let i = 0; i < 300; i++) {
+                        graphSimulation.simulation.tick();
                     }
-                });
-            });
 
-                d3.select("#objectTypes")
-                .selectAll("label")
-                .data(nodeTypes)
-                .enter()
-                .append("label")
-                .html(d => `<input type="checkbox" checked> ${d}`)
-                .style("color", "#e0e0e0")
-                .style("background-color", d => colorScale(d))
-                .style("padding", "2px 5px")
-                .style("border-radius", "3px")
-                .style("margin-right", "5px")
-                .on("change", function(event, d) {
-                    const checked = event.target.checked;
-                    node.filter(n => n.type === d)
-                        .style("display", checked ? "block" : "none");
-                    link.filter(l => l.source.type === d || l.target.type === d)
-                        .style("display", checked ? "block" : "none");
-                });
+                    zoomHandler.zoomToFit();
 
-                d3.select("#hideUnselected").on("change", function() {
-                    mouseInteractions.setHideUnselectedNodes(this.checked);
-                });
-                
+                    // Set up the simulation tick callback
+                    graphSimulation.setTickCallback(() => {
+                        link
+                            .attr("x1", d => d.source.x)
+                            .attr("y1", d => d.source.y)
+                            .attr("x2", d => d.target.x)
+                            .attr("y2", d => d.target.y);
 
-                // Handle window resizing
-                window.addEventListener('resize', () => {
-                    const width = graphContainer.clientWidth;
-                    const height = graphContainer.clientHeight;
+                        node
+                            .attr("cx", d => d.x)
+                            .attr("cy", d => d.y);
+
+                        label
+                            .attr("x", d => d.x)
+                            .attr("y", d => d.y);
+
+                        minimapInstance.updateMinimap();
+
+                        if (graphSimulation.simulation.alpha() < 0.1) {
+                            updateProgress(100);
+                            setTimeout(() => {
+                                loadingContainer.style.display = 'none';
+                            }, 500);
+                        }
+                    });
+
+                    // Event handlers
+                    d3.select("#showLabels").on("change", function() {
+                        mouseInteractions.toggleLabels(this.checked);
+                    });
                     
-                    graphSimulation.updateDimensions(width, height);
-                    minimapInstance.updateDimensions(width, height);
-                    zoomHandler.updateDimensions(width, height);
+                    d3.select("#hideUnselected").on("change", function() {
+                        mouseInteractions.setHideUnselectedNodes(this.checked);
+                    });
+
+                    d3.select("#objectTypes")
+                        .selectAll("label")
+                        .data(nodeTypes)
+                        .enter()
+                        .append("label")
+                        .html(d => `<input type="checkbox" checked> ${d}`)
+                        .style("color", "#e0e0e0")
+                        .style("background-color", d => colorScale(d))
+                        .style("padding", "5px 8px")
+                        .style("border-radius", "3px")
+                        .style("margin-right", "5px")
+                        .on("change", function(event, d) {
+                            const checked = event.target.checked;
+                            mouseInteractions.objectTypeFilter(event, d, checked);
+                    });
+
+                    // Handle window resizing
+                    window.addEventListener('resize', () => {
+                        const width = graphContainer.clientWidth;
+                        const height = graphContainer.clientHeight;
+                        
+                        graphSimulation.updateDimensions(width, height);
+                        minimapInstance.updateDimensions(width, height);
+                        zoomHandler.updateDimensions(width, height);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    document.querySelector('.loading-text').textContent = 'Error loading graph data';
+                    progressFill.style.backgroundColor = 'var(--accent-color)';
                 });
-                const nodeToClick = mouseInteractions.node.filter(n => n.id === nodeId).datum();
-                mouseInteractions.handleNodeClick(null, nodeToClick)
-            })
-            .catch(error => {
-                console.error('Error fetching data:', error);
-                document.querySelector('.loading-text').textContent = 'Error loading graph data';
-                progressFill.style.backgroundColor = 'var(--accent-color)';
-            });
-</script>
+        }
+
+        // Initial fetch
+        fetchData();
+
+        // Add event listener to re-fetch data when the dropdown changes
+        lineageSourceSelect.addEventListener('change', fetchData);
+    </script>
 </body>
 </html>
