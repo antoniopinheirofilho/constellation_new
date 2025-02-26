@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import random
 import string
 from databricks import sql
@@ -6,6 +6,7 @@ from databricks.sdk.core import Config
 import os
 import pandas as pd
 import logging
+from typing import Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,6 +27,10 @@ def sqlQuery(query: str) -> pd.DataFrame:
         Exception: If there's an error during the database query.
     """
     try:
+        logger.info(f"""Running the folowing query:\n
+                        {query}
+                    """)
+
         cfg = Config()  # Pull environment variables for auth
         with sql.connect(
             server_hostname=cfg.host,
@@ -82,7 +87,7 @@ def index():
     return render_template('d3_dag_viz.html')
 
 @app.route('/subgraph/<node_id>')
-def subgraph(node_id):
+def subgraph(node_id: str):
     """
     Render the subgraph page for a specific node.
     Useful  when the amount of nodes from the total graph is massive.
@@ -145,13 +150,21 @@ def search(node_id: str):
     return  jsonify({"nodes": connected_nodes, "links": connected_links})
 
 @app.route('/nodes')
-def get_nodes():
+def get_nodes(filter_str: Optional[str]):
     """
     Retrieve nodes from the database.
 
     Returns:
         list: A list of dictionaries containing node information.
     """
+    if request.args.get('lineage_source_table'):
+        filter_str = f"""WHERE lineage_source_table = '{request.args.get('lineage_source_table')}'"""
+    elif filter_str is not None:
+        pass
+    else:
+        filter_str = ""
+    logger.info(f"Using the folowing filter to nodes: {filter_str}")
+
     return sqlQuery(f"""
                     WITH CONNECTION_BY_NODE AS(
                     SELECT node as id, SUM(total_connections) total_connections FROM (
@@ -171,28 +184,40 @@ def get_nodes():
                             entity_path,
                             date_diff(day,last_event_date,current_date()) days_last_interaction,
                             last_event_date,
-                            COALESCE(total_connections,0) total_connections
-                            FROM main.ad_lineage_grafos.lineage_nodes t1
+                            COALESCE(total_connections,0) total_connections,
+                            t1.lineage_source_table
+                            FROM main.ad_lineage_grafos_test.lineage_nodes t1
                             LEFT JOIN CONNECTION_BY_NODE t2 ON t1.node = t2.id
+                            {filter_str}
                     """)
                         
 @app.route('/links')
-def get_links():
+def get_links(filter_str: Optional[str]):
     """
     Retrieve links from the database.
 
     Returns:
         list: A list of dictionaries containing link information.
     """
-    return sqlQuery("""
+    if request.args.get('lineage_source_table'):
+        filter_str = f"""WHERE lineage_source_table = '{request.args.get('lineage_source_table')}'"""
+    elif filter_str is not None:
+        pass
+    else:
+        filter_str = "" 
+    logger.info(f"Using the folowing filter to links: {filter_str}")
+
+    return sqlQuery(f"""
             SELECT source_node as source, 
                 target_node as target,
                 entity_path,
                 source_node_type as source_type,
                 target_node_type as target_type,
-                last_event_date
-                FROM main.ad_lineage_grafos.lineage_links
-                """)
+                last_event_date,
+                lineage_source_table
+                FROM main.ad_lineage_grafos_test.lineage_links
+                {filter_str}    
+            """)
 
 @app.route('/dag_data')
 def dag_data():
@@ -203,11 +228,17 @@ def dag_data():
         flask.Response: JSON response containing nodes and links for the DAG.
     """
     try:
+        if request.args.get('lineage_source_table'):
+            filter_str = f"""WHERE lineage_source_table = '{request.args.get('lineage_source_table')}'"""
+            logger.info(f"Using the folowing filter: {filter_str}")
+        else:
+            filter_str = ""
+
         # fake_dag = generate_fake_dag()
         logger.info("Fetching dag data...")
-        nodes = get_nodes()
+        nodes = get_nodes(filter_str)
         logger.info(f"Retrieved {len(nodes)} nodes")
-        links = get_links()
+        links = get_links(filter_str)
         logger.info(f"Retrieved {len(links)} links")
 
         return jsonify({"nodes": nodes, "links": links})
