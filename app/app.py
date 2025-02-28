@@ -87,7 +87,7 @@ def index():
     return render_template('d3_dag_viz.html')
 
 @app.route('/subgraph/<node_id>')
-def subgraph(node_id: str):
+def subgraph(node_id):
     """
     Render the subgraph page for a specific node.
     Useful  when the amount of nodes from the total graph is massive.
@@ -98,7 +98,7 @@ def subgraph(node_id: str):
     Returns:
         str: Rendered HTML template for the subgraph page.
     """
-    return render_template('d3_dag_viz_subgraph.html')
+    return render_template('dexco_d3_dag_viz_subgraph.html')
 
 @app.route('/search/<node_id>')
 def search(node_id: str):
@@ -157,12 +157,15 @@ def get_nodes(filter_str: Optional[str]):
     Returns:
         list: A list of dictionaries containing node information.
     """
-    if request.args.get('lineage_source_table'):
-        filter_str = f"""WHERE lineage_source_table = '{request.args.get('lineage_source_table')}'"""
-    elif filter_str is not None:
-        pass
-    else:
+    lineage_source_table = request.args.get('lineage_source_table') 
+    if lineage_source_table == "all" or lineage_source_table is None:
         filter_str = ""
+    elif lineage_source_table in ["hms_table_lineage", "table_lineage"]:    
+        filter_str = f"""WHERE lineage_source_table = '{lineage_source_table}'"""
+    elif filter_str is not None:
+        filter_str = f"""WHERE lineage_source_table = '{lineage_source_table}'"""
+
+
     logger.info(f"Using the folowing filter to nodes: {filter_str}")
 
     return sqlQuery(f"""
@@ -199,12 +202,14 @@ def get_links(filter_str: Optional[str]):
     Returns:
         list: A list of dictionaries containing link information.
     """
-    if request.args.get('lineage_source_table'):
-        filter_str = f"""WHERE lineage_source_table = '{request.args.get('lineage_source_table')}'"""
+    lineage_source_table = request.args.get('lineage_source_table') 
+    if lineage_source_table == "all" or lineage_source_table is None:
+        filter_str = ""
+    elif lineage_source_table in ["hms_table_lineage", "table_lineage"]:    
+        filter_str = f"""WHERE lineage_source_table = '{lineage_source_table}'"""
     elif filter_str is not None:
-        pass
-    else:
-        filter_str = "" 
+        filter_str = f"""WHERE lineage_source_table = '{lineage_source_table}'"""
+
     logger.info(f"Using the folowing filter to links: {filter_str}")
 
     return sqlQuery(f"""
