@@ -22,7 +22,8 @@ links_df = spark.sql(f"""
         ou_t.node AS target_node,
         ou_t.node_type AS target_node_type, 
         ou_t.entity_path,
-        DATE(MAX(stf.last_event_time)) AS last_event_date
+        DATE(MAX(stf.last_event_time)) AS last_event_date,
+        stf.lineage_source_table
     FROM {catalog}.{schema}.vw_sources_targets_fill stf
     JOIN {catalog}.{schema}.vw_objects_union ou_s -- Populate with source nodes
         ON stf.source_object = ou_s.node 
@@ -71,7 +72,7 @@ else:
     merge_result = lineage_links_table.alias('lineage_links') \
         .merge(
             links_df.alias('new_links'),
-            'lineage_links.source_node = new_links.source_node AND lineage_links.source_node_type = new_links.source_node_type AND lineage_links.target_node = new_links.target_node AND lineage_links.target_node_type = new_links.target_node_type AND lineage_links.entity_path = new_links.entity_path'
+            'lineage_links.source_node = new_links.source_node AND lineage_links.source_node_type = new_links.source_node_type AND lineage_links.target_node = new_links.target_node AND lineage_links.target_node_type = new_links.target_node_type AND lineage_links.entity_path = new_links.entity_path AND lineage_links.lineage_source_table = new_links.lineage_source_table'
         ) \
         .whenMatchedUpdateAll( # If the new link is more recent, update the existing one
             condition='lineage_links.last_event_date <= new_links.last_event_date'
@@ -83,6 +84,7 @@ else:
             "target_node_type": "new_links.target_node_type",
             "entity_path": "new_links.entity_path",
             "last_event_date": "new_links.last_event_date",
+            "lineage_source_table": "new_links.lineage_source_table"
         }) \
         .execute()
 

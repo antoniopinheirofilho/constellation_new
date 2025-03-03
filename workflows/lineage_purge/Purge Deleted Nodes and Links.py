@@ -21,24 +21,6 @@ schema = dbutils.widgets.get("schema")
 # Obtain the number of days to offset for filtering events in the query
 offset_days = dbutils.widgets.get("offset_days")
 
-
-
-# # Retrieve workspace URL and ID from task values for dynamic query construction
-# # workspace_url = dbutils.jobs.taskValues.get(taskKey='functions_and_configuration_parameters', key="workspace_url")
-# from dbruntime.databricks_repl_context import get_context
-
-# # workspace_id = dbutils.jobs.taskValues.get(taskKey='functions_and_configuration_parameters', key="workspace_id")
-# workspace_url = spark.conf.get("spark.databricks.workspaceUrl")
-# workspace_id = get_context().workspaceId
-# # Fetch catalog and schema names from notebook widgets for view creation
-# # catalog = dbutils.widgets.get("catalog")
-# # schema = dbutils.widgets.get("schema")
-# catalog = "stage"
-# schema = "ad_lineage_grafos"
-# # Obtain the number of days to offset for filtering events in the query
-# # offset_days = dbutils.widgets.get("offset_days")
-# offset_days = 365
-
 # COMMAND ----------
 
 # MAGIC %md
@@ -46,12 +28,40 @@ offset_days = dbutils.widgets.get("offset_days")
 
 # COMMAND ----------
 
+from pyspark.sql import SparkSession
+from concurrent.futures import ThreadPoolExecutor
+
+# Function to list tables in a given schema
+def list_tables(schema_name):
+    tables = spark.sql(f"SHOW TABLES IN hive_metastore.{schema_name}").collect()
+    return [f"hive_metastore.{schema_name}.{t.tableName}" for t in tables]
+
+# Fetch all schemas in Hive Metastore
+schemas = [s.databaseName for s in spark.sql("SHOW SCHEMAS IN hive_metastore").collect()]
+
+# Use ThreadPoolExecutor for parallel execution
+hms_inventory = []
+with ThreadPoolExecutor() as executor:
+    results = executor.map(list_tables, schemas)
+
+# Flatten the results into a single list
+for res in results:
+    hms_inventory.extend(res)
+
+# Convert list to Spark DataFrame
+df_hms = spark.createDataFrame(hms_inventory)
+df_hms = df_hms.withColumn("last_altered", lit(datetime.max)) # Workaround since HMS doesn't display the last altered data. This will ensure that we always include all existing HMS tables
+df_hms.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.hms_table_inventory")
+
+# COMMAND ----------
 
 spark.sql(f"""
---When it goes to production this should change to use system.information_schema.tables
 CREATE OR REPLACE TABLE {catalog}.{schema}.table_view
 select TRIM(table_catalog ||"."|| table_schema ||"."||table_name) table_id
-from stage.ad_lineage_grafos.tables_information_schema
+from system.information_schema.tables
+union
+select TRIM(table_catalog ||"."|| table_schema ||"."||table_name) table_id 
+from {catalog}.{schema}.hms_table_inventory
 """)
 
 # COMMAND ----------
@@ -135,9 +145,9 @@ operation_metrics_m = lineage_links.history(1).select("operationMetrics").collec
 iperation_metrics_m = int(operation_metrics_m.get("numTargetRowsDeleted", "0"))
 
 delete_result_table_views = lineage_links.delete(
-    f"""(source_node_type = 'TABLE/VIEW' AND source_node NOT IN ( SELECT table_id 
+    f"""(source_node_type = 'TABLE/VIEW/PATH' AND source_node NOT IN ( SELECT table_id 
                             FROM {catalog}.{schema}.table_view))
-         OR (target_node_type = 'TABLE/VIEW' AND target_node NOT IN ( SELECT table_id 
+         OR (target_node_type = 'TABLE/VIEW/PATH' AND target_node NOT IN ( SELECT table_id 
                             FROM {catalog}.{schema}.table_view))
     """
 )
@@ -146,11 +156,9 @@ operation_metrics_d = lineage_links.history(1).select("operationMetrics").collec
 # Extract the number of deleted rows
 num_deleted_rows = int(operation_metrics_m.get("numTargetRowsDeleted", "0")) + int(operation_metrics_d.get("numDeletedRows", "0"))
 
-print(f"Number of rows deleted: {num_deleted_rows}")
-
 # COMMAND ----------
 
-print(num_deleted_rows)
+print(f"Number of rows deleted: {num_deleted_rows}")
 
 # COMMAND ----------
 
@@ -174,7 +182,7 @@ operation_metrics_m = lineage_nodes.history(1).select("operationMetrics").collec
 iperation_metrics_m = int(operation_metrics_m.get("numTargetRowsDeleted", "0"))
 
 delete_result_table_views = lineage_nodes.delete(
-    f"""(node_type = 'TABLE/VIEW' AND node NOT IN (SELECT table_id 
+    f"""(node_type = 'TABLE/VIEW/PATH' AND node NOT IN (SELECT table_id 
                             FROM {catalog}.{schema}.table_view))
      """)
 operation_metrics_d = lineage_nodes.history(1).select("operationMetrics").collect()[0][0]

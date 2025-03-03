@@ -720,3 +720,48 @@ h1 {
 .level-message.show {
     opacity: 1;
 }
+
+/* Style for the lineageSource dropdown container */
+#lineageSource {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 0.5rem;
+    background-color: var(--bg-tertiary);
+    border-radius: var(--rounded-sm);
+    border: 1px solid var(--border-color);
+    transition: var(--transition-default);
+    user-select: none;
+    font-size: 0.875rem;
+    height: 32px;
+    box-sizing: border-box;
+}
+
+#lineageSource:hover {
+    transform: translateY(-1px);
+}
+
+#lineageSource:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--accent-color);
+}
+
+/* Style for the dropdown options */
+#lineageSource option {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* Adjust the container to accommodate the new dropdown */
+.controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* Ensure the lineageSource dropdown aligns with other elements */
+.controls > * {
+    margin-bottom: 0.5rem;
+}

@@ -1,0 +1,100 @@
+bundle:
+  name: constellation_bundle
+resources:
+  jobs:
+    constellation_graph_representation:
+      name: "[constellation] Graph Representation"
+      trigger:
+        pause_status: PAUSED
+        periodic:
+          interval: 1
+          unit: WEEKS
+      tasks:
+        - task_key: functions_and_configuration_parameters
+          notebook_task:
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_graph/Functions and Configuration Parameters
+            source: WORKSPACE
+        - task_key: lineage_graph
+          depends_on:
+            - task_key: functions_and_configuration_parameters
+          notebook_task:
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_graph/Lineage Base Sources and Targets View
+            base_parameters:
+              workspace_url: "{{tasks.functions_and_configuration_parameters.values.workspace\
+                _url}}"
+              workspace_id: "{{tasks.functions_and_configuration_parameters.values.workspace_\
+                id}}"
+            source: WORKSPACE
+        - task_key: lineage_base_nodes_view
+          depends_on:
+            - task_key: lineage_graph
+          notebook_task:
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_graph/Lineage Base Nodes View
+            base_parameters:
+              workspace_url: "{{tasks.functions_and_configuration_parameters.values.workspace\
+                _url}}"
+            source: WORKSPACE
+        - task_key: lineage_links
+          depends_on:
+            - task_key: lineage_graph
+            - task_key: lineage_base_nodes_view
+          notebook_task:
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_graph/Lineage Links
+            source: WORKSPACE
+        - task_key: lineage_nodes
+          depends_on:
+            - task_key: lineage_base_nodes_view
+            - task_key: lineage_links
+          notebook_task:
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_graph/Lineage Nodes
+            source: WORKSPACE
+        - task_key: purge_old_data
+          depends_on:
+            - task_key: lineage_links
+            - task_key: lineage_nodes
+          notebook_task:
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_graph/Purge Old Data
+            source: WORKSPACE
+      queue:
+        enabled: true
+      parameters:
+        - name: catalog
+          default: main
+        - name: schema
+          default: ad_lineage_grafos
+        - name: offset_days
+          default: "365"
+        - name: purge_offset_days
+          default: "365"
+    constellation_Purge_Nodes_and_Links:
+      name: "[constellation] Purge Nodes and Links"
+      trigger:
+        pause_status: PAUSED
+        periodic:
+          interval: 1
+          unit: WEEKS
+      tasks:
+        - task_key: functions_and_configuration_parameters
+          notebook_task:
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_graph/Functions and Configuration Parameters
+            source: WORKSPACE
+        - task_key: purge_deleted_nodes_and_links
+          depends_on:
+            - task_key: functions_and_configuration_parameters
+          notebook_task:
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}/files/lineage_purge/Purge Deleted Nodes and Links
+            source: WORKSPACE
+      queue:
+        enabled: true
+      parameters:
+        - name: catalog
+          default: main
+        - name: schema
+          default: ad_lineage_grafos
+        - name: offset_days
+          default: "365"
+        - name: purge_offset_days
+          default: "365"
+targets:
+  dev:
+    default: true
