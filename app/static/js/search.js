@@ -53,7 +53,8 @@ class SearchHandler {
                     .text(`${node.name} (${node.type})`)
                     .on("click", (event) => {
                         event.stopPropagation();
-                        this.selectNode(node);
+                        this.cleanupPreviousGraph()
+                        this.fetchData(node.name)
                     });
             });
             this.suggestionsContainer.style("display", "block");
@@ -129,7 +130,7 @@ class SearchHandler {
                         `${node.name} (${node.type})` === suggestions.nodes()[selectedIndex].textContent
                     );
                     if (selectedNode) {
-                        console.log(selectedNode)
+                        this.cleanupPreviousGraph()
                         this.fetchData(selectedNode.name)
                     }
                 }
