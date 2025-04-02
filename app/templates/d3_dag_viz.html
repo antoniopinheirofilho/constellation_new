@@ -114,16 +114,27 @@
             };
         })();
 
-        function fetchData() {
+        function fetchData(target_node = "most_connected") {
+            
             d3.select("svg").selectAll("g").remove();
 
             const selectedSource = lineageSourceSelect.value;
-            const url = `/dag_data?lineage_source_table=${selectedSource}`;
+            const url = `/search/${target_node}?lineage_source_table=${selectedSource}`;
 
+            // Parameters to include in the request body
+            const requestBody = {
+                lineage_source_table: selectedSource,
+                target_node: target_node
+            };
             loadingContainer.style.display = 'block';
             updateProgress(20);
 
-            fetch(url)
+            fetch(url, {
+                    method: 'GET', 
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
                 .then(response => response.json())
                 .then(data => {
                     updateProgress(40);
@@ -254,7 +265,7 @@
                     mouseInteractions.updateIndicators(formattedIndicators, labels);
 
                     // Initialize search handler
-                    const searchHandler = new SearchHandler(data, mouseInteractions, zoomHandler);
+                    const searchHandler = new SearchHandler(data, mouseInteractions, zoomHandler, fetchData, cleanupPreviousGraph);
 
                     // Run initial simulation ticks
                     graphSimulation.simulation
