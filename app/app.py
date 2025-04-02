@@ -7,11 +7,12 @@ import os
 import pandas as pd
 import logging
 from typing import Optional
-
-logging.basicConfig(level=logging.INFO)
+import socket
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
 
 def sqlQuery(query: str) -> pd.DataFrame:
     """
@@ -27,15 +28,17 @@ def sqlQuery(query: str) -> pd.DataFrame:
         Exception: If there's an error during the database query.
     """
     try:
-        logger.info(f"""Running the folowing query:\n
+        logger.info(
+            f"""Running the folowing query:\n
                         {query}
-                    """)
+                    """
+        )
 
         cfg = Config()  # Pull environment variables for auth
         with sql.connect(
             server_hostname=cfg.host,
             http_path=f"/sql/1.0/warehouses/148ccb90800933a1",
-            credentials_provider=lambda: cfg.authenticate
+            credentials_provider=lambda: cfg.authenticate,
         ) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(query)
@@ -46,10 +49,12 @@ def sqlQuery(query: str) -> pd.DataFrame:
     except Exception as e:
         print(f"Database query error: {str(e)}")
         raise e
-        
+
+
 def generate_random_name():
     """Create a random name to be consumed during the creation of fake data"""
-    return ''.join(random.choices(string.ascii_letters, k=5))
+    return "".join(random.choices(string.ascii_letters, k=5))
+
 
 def generate_fake_dag():
     """
@@ -60,22 +65,29 @@ def generate_fake_dag():
         dict: A dictionary containing 'nodes' and 'links' for the generated DAG.
     """
     num_nodes = 1000
-    nodes = [{"id": f"develop.cassol.tabela_2_8653031800044{i}",
-              "name": generate_random_name(),
-              "type": random.choice(["Job", "Notebook", 
-                                     "Table", "Dashboard",
-                                     "Dataset"]),
-             "days_last_interaction":252,
-             "entity_path":"https://google.com",
-             "last_event_date":"Mon, 18 Mar 2024 00:00:00 GMT",
-             "total_connections":25}
-              for i in range(num_nodes)]
-    links = [{"source": nodes[i]["id"], 
-              "target": nodes[random.randint(i+1, num_nodes-1)]["id"]}
-              for i in range(num_nodes-1)]
+    nodes = [
+        {
+            "id": f"develop.cassol.tabela_2_8653031800044{i}",
+            "name": generate_random_name(),
+            "type": random.choice(["Job", "Notebook", "Table", "Dashboard", "Dataset"]),
+            "days_last_interaction": 252,
+            "entity_path": "https://google.com",
+            "last_event_date": "Mon, 18 Mar 2024 00:00:00 GMT",
+            "total_connections": 25,
+        }
+        for i in range(num_nodes)
+    ]
+    links = [
+        {
+            "source": nodes[i]["id"],
+            "target": nodes[random.randint(i + 1, num_nodes - 1)]["id"],
+        }
+        for i in range(num_nodes - 1)
+    ]
     return {"nodes": nodes, "links": links}
 
-@app.route('/')
+
+@app.route("/")
 def index():
     """
     Render the main page of the application.
@@ -84,9 +96,10 @@ def index():
         str: Rendered HTML template for the main page.
     """
 
-    return render_template('d3_dag_viz.html')
+    return render_template("d3_dag_viz.html")
 
-@app.route('/subgraph/<node_id>')
+
+@app.route("/subgraph/<node_id>")
 def subgraph(node_id):
     """
     Render the subgraph page for a specific node.
@@ -98,28 +111,62 @@ def subgraph(node_id):
     Returns:
         str: Rendered HTML template for the subgraph page.
     """
-    return render_template('dexco_d3_dag_viz_subgraph.html')
+    return render_template("dexco_d3_dag_viz_subgraph.html")
 
-@app.route('/search/<node_id>')
+
+@app.route("/search/<node_id>")
 def search(node_id: str):
     """
     Search for nodes and links connected to a specific node using Breadth-First Search (BFS).
 
     Args:
-        node_id (str): The ID of the node to search from.
 
     Returns:
         flask.Response: JSON response containing connected nodes and links.
     """
+
+    lineage_source_table = request.args.get("lineage_source_table", "all")
+
+    filter_str = (
+        f"WHERE lineage_source_table = '{lineage_source_table}'"
+        if lineage_source_table != "all"
+        else ""
+    )
+    logger.info(f"Using the following filter: {filter_str}")
+
     logger.info("Fetching dag data...")
-    nodes = get_nodes()
+    nodes = get_nodes(filter_str)
     logger.info(f"Retrieved {len(nodes)} nodes")
-    links = get_links()
+    links = get_links(filter_str)
     logger.info(f"Retrieved {len(links)} links")
     connected_nodes = set()
     connected_links = dict()
-    logger.info(f"Searching nodes connected to {node_id}")
-
+    if node_id == "most_connected":
+        most_connected_id = sqlQuery(
+            f"""
+                    WITH CONNECTION_BY_NODE AS(
+                    SELECT node as id, SUM(total_connections) total_connections FROM (
+                        SELECT source_node node,count(target_node) total_connections
+                        FROM main.ad_lineage_grafos_test.lineage_links
+                        {filter_str}
+                        GROUP BY source_node
+                        UNION 
+                        SELECT target_node node,count(source_node) total_connections
+                        FROM main.ad_lineage_grafos_test.lineage_links
+                        {filter_str}
+                        GROUP BY target_node
+                    )
+                    GROUP BY ALL)
+                    SELECT id FROM CONNECTION_BY_NODE ORDER BY total_connections DESC LIMIT 1
+                    """
+        )
+        logger.info(most_connected_id)
+        node_id = most_connected_id[0]["id"]
+        logger.info(
+            f"Searching nodes connected to {node_id} based on most connected node"
+        )
+    else:
+        logger.info(f"Searching nodes connected to {node_id}")
 
     def bfs(start_node, is_upstream):
         """Apply Breadth-First Search to find connected nodes and links."""
@@ -132,10 +179,10 @@ def search(node_id: str):
             for link in links:
                 neighbor = False
                 if is_upstream and link["target"] == current_node:
-                    connected_links[link["source"]+link["target"]] = link
+                    connected_links[link["source"] + link["target"]] = link
                     neighbor = link["source"]
-                elif not is_upstream and link["source"]== current_node:
-                    connected_links[link["source"]+link["target"]] = link
+                elif not is_upstream and link["source"] == current_node:
+                    connected_links[link["source"] + link["target"]] = link
                     neighbor = link["target"]
 
                 if neighbor is not False and neighbor not in visited:
@@ -147,36 +194,46 @@ def search(node_id: str):
     bfs(node_id, False)
     connected_nodes = [node for node in nodes if node["id"] in connected_nodes]
     connected_links = [link for _, link in connected_links.items()]
-    return  jsonify({"nodes": connected_nodes, "links": connected_links})
+    full_nodes_ids = [{"name": node["name"], "type": node["type"]} for node in nodes]
+    logger.info(f"Found {len(connected_nodes)} connected nodes")
+    return jsonify(
+        {
+            "nodes": connected_nodes,
+            "links": connected_links,
+            "full_nodes_ids": full_nodes_ids,
+            "target": node_id
+        }
+    )
 
-@app.route('/nodes')
-def get_nodes(filter_str: Optional[str]):
+
+@app.route("/nodes")
+def get_nodes(filter_str: Optional[str] = None):
     """
     Retrieve nodes from the database.
 
     Returns:
         list: A list of dictionaries containing node information.
     """
-    lineage_source_table = request.args.get('lineage_source_table') 
+    lineage_source_table = request.args.get("lineage_source_table")
     if lineage_source_table == "all" or lineage_source_table is None:
         filter_str = ""
-    elif lineage_source_table in ["hms_table_lineage", "table_lineage"]:    
+    elif lineage_source_table in ["hms_table_lineage", "table_lineage"]:
         filter_str = f"""WHERE lineage_source_table = '{lineage_source_table}'"""
     elif filter_str is not None:
         filter_str = f"""WHERE lineage_source_table = '{lineage_source_table}'"""
 
-
     logger.info(f"Using the folowing filter to nodes: {filter_str}")
 
-    return sqlQuery(f"""
+    return sqlQuery(
+        f"""
                     WITH CONNECTION_BY_NODE AS(
                     SELECT node as id, SUM(total_connections) total_connections FROM (
                         SELECT source_node node,count(target_node) total_connections
-                        FROM main.ad_lineage_grafos.lineage_links
+                        FROM main.ad_lineage_grafos_test.lineage_links
                         GROUP BY source_node
                         UNION 
                         SELECT target_node node,count(source_node) total_connections
-                        FROM main.ad_lineage_grafos.lineage_links
+                        FROM main.ad_lineage_grafos_test.lineage_links
                         GROUP BY target_node
                     )
                     GROUP BY ALL)
@@ -192,27 +249,30 @@ def get_nodes(filter_str: Optional[str]):
                             FROM main.ad_lineage_grafos_test.lineage_nodes t1
                             LEFT JOIN CONNECTION_BY_NODE t2 ON t1.node = t2.id
                             {filter_str}
-                    """)
-                        
-@app.route('/links')
-def get_links(filter_str: Optional[str]):
+                    """
+    )
+
+
+@app.route("/links")
+def get_links(filter_str: Optional[str] = None):
     """
     Retrieve links from the database.
 
     Returns:
         list: A list of dictionaries containing link information.
     """
-    lineage_source_table = request.args.get('lineage_source_table') 
+    lineage_source_table = request.args.get("lineage_source_table")
     if lineage_source_table == "all" or lineage_source_table is None:
         filter_str = ""
-    elif lineage_source_table in ["hms_table_lineage", "table_lineage"]:    
+    elif lineage_source_table in ["hms_table_lineage", "table_lineage"]:
         filter_str = f"""WHERE lineage_source_table = '{lineage_source_table}'"""
     elif filter_str is not None:
         filter_str = f"""WHERE lineage_source_table = '{lineage_source_table}'"""
 
     logger.info(f"Using the folowing filter to links: {filter_str}")
 
-    return sqlQuery(f"""
+    return sqlQuery(
+        f"""
             SELECT source_node as source, 
                 target_node as target,
                 entity_path,
@@ -222,9 +282,11 @@ def get_links(filter_str: Optional[str]):
                 lineage_source_table
                 FROM main.ad_lineage_grafos_test.lineage_links
                 {filter_str}    
-            """)
+            """
+    )
 
-@app.route('/dag_data')
+
+@app.route("/dag_data")
 def dag_data():
     """
     Retrieve DAG data including nodes and links.
@@ -233,7 +295,7 @@ def dag_data():
         flask.Response: JSON response containing nodes and links for the DAG.
     """
     try:
-        if request.args.get('lineage_source_table'):
+        if request.args.get("lineage_source_table"):
             filter_str = f"""WHERE lineage_source_table = '{request.args.get('lineage_source_table')}'"""
             logger.info(f"Using the folowing filter: {filter_str}")
         else:
@@ -244,7 +306,7 @@ def dag_data():
         nodes = get_nodes(filter_str)
         logger.info(f"Retrieved {len(nodes)} nodes")
         links = get_links(filter_str)
-        logger.info(f"Retrieved {len(links)} links")
+        # logger.info(f"Retrieved {len(links)} links")
 
         return jsonify({"nodes": nodes, "links": links})
         # return jsonify({"nodes": fake_dag["nodes"], "links": fake_dag["links"]})
@@ -253,5 +315,6 @@ def dag_data():
 
         return jsonify({"error": str(e)}), 500
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app.run(debug=True, port=8000)

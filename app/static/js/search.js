@@ -1,12 +1,13 @@
 class SearchHandler {
-    constructor(data, mouseInteractions, zoomHandler) {
+    constructor(data, mouseInteractions, zoomHandler, fetchData,cleanupPreviousGraph) {
         this.data = data;
         this.mouseInteractions = mouseInteractions;
         this.zoomHandler = zoomHandler;
         this.searchInput = d3.select("#search");
         this.suggestionsContainer = d3.select("#suggestions");
         this.hideUnselectedCheckbox = d3.select("#hideUnselected");
-        
+        this.fetchData = fetchData;
+        this.cleanupPreviousGraph = cleanupPreviousGraph;
         this.initializeEventListeners();
     }
 
@@ -38,8 +39,7 @@ class SearchHandler {
             this.hideUnselectedCheckbox.property("checked", false);
             return;
         }
-
-        const matchingNodes = this.data.nodes.filter(node => 
+        const matchingNodes = this.data.full_nodes_ids.filter(node => 
             node.name.toLowerCase().includes(input) || 
             node.type.toLowerCase().includes(input)
         );
@@ -53,7 +53,8 @@ class SearchHandler {
                     .text(`${node.name} (${node.type})`)
                     .on("click", (event) => {
                         event.stopPropagation();
-                        this.selectNode(node);
+                        this.cleanupPreviousGraph()
+                        this.fetchData(node.name)
                     });
             });
             this.suggestionsContainer.style("display", "block");
@@ -125,11 +126,12 @@ class SearchHandler {
             case "Enter":
                 event.preventDefault();
                 if (selectedIndex !== -1) {
-                    const selectedNode = this.data.nodes.find(node => 
+                    const selectedNode = this.data.full_nodes_ids.find(node => 
                         `${node.name} (${node.type})` === suggestions.nodes()[selectedIndex].textContent
                     );
                     if (selectedNode) {
-                        this.selectNode(selectedNode);
+                        this.cleanupPreviousGraph()
+                        this.fetchData(selectedNode.name)
                     }
                 }
                 break;
